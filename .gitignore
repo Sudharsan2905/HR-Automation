@@ -41,3 +41,6 @@ Thumbs.db
 # Claude Code local files
 .claude/
 docs/.idea/
+
+# Original upstream clones kept locally (history of Level1 repos)
+.git-upstream/

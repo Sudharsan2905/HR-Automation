@@ -1,0 +1,7 @@
+#!/usr/bin/env sh
+
+# Run lint-staged (ESLint + Prettier on staged files)
+npx lint-staged
+
+# TypeScript type-check (whole project, not just staged files)
+npx tsc --noEmit

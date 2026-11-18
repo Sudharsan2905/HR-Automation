@@ -1,0 +1,271 @@
+.pageRoot {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ── Left list panel ── */
+.listPanel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-y: auto;
+  /* Explicit — without it, `overflow-y: auto` makes `overflow-x` compute to
+     `auto` too, producing a spurious horizontal scrollbar when a child (e.g. a
+     long meta line) is slightly too wide. */
+  overflow-x: hidden;
+  transition: flex 0.25s ease;
+}
+
+.listPanelNarrow {
+  flex: 1 1 0;
+  border-right: 1px solid var(--border-color, #e2e8f0);
+}
+
+.centered {
+  display: flex;
+  justify-content: center;
+  padding: 60px;
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 60px 20px;
+  color: var(--text-muted, #94a3b8);
+  text-align: center;
+}
+
+.empty p {
+  font-size: 14px;
+  margin: 0;
+  color: var(--text-secondary, #475569);
+}
+
+.empty span {
+  font-size: 12px;
+}
+
+.sessionList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sessionCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: var(--bg-surface, #ffffff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: var(--radius-lg, 12px);
+  box-shadow: var(--shadow-xs, 0 1px 2px rgba(15, 23, 42, 0.04));
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s,
+    transform 0.15s;
+  width: 100%;
+}
+
+.sessionCard:hover {
+  border-color: var(--brand-orange, #f4511e);
+  box-shadow: var(--shadow-md, 0 4px 12px rgba(15, 23, 42, 0.08));
+  transform: translateY(-1px);
+}
+
+.sessionCardSelected,
+.sessionCardSelected:hover {
+  background: var(--color-primary-light, #eef2ff);
+  border-color: transparent;
+  border-left: 3px solid var(--color-primary, #6366f1);
+  box-shadow: none;
+  transform: none;
+}
+
+.cardLeft {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.liveRing {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #22c55e;
+  border: 2px solid #fff;
+  animation: livePulse 2s ease-in-out infinite;
+}
+
+@keyframes livePulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+.cardBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #1e293b);
+  margin: 0 0 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.assessment {
+  font-size: 12px;
+  color: var(--text-secondary, #475569);
+  margin: 0 0 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.meta {
+  font-size: 11px;
+  color: var(--text-muted, #94a3b8);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  min-width: 0;
+  gap: 6px;
+}
+
+.malBadge {
+  color: var(--color-warning, #f59e0b);
+  font-weight: 600;
+}
+
+.cardRight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.watchLabel {
+  font-size: 11px;
+  color: var(--color-primary, #6366f1);
+  font-weight: 600;
+}
+
+/* ── Right stream panel ── */
+.streamPanel {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Backdrop is invisible on desktop (panel is inline); becomes a dimmer on tablet/mobile */
+.streamBackdrop {
+  display: none;
+}
+
+/* ── Tablet & mobile: show the stream panel as a centered popup overlay ── */
+@media (max-width: 1024px) {
+  .listPanelNarrow {
+    flex: 1 1 auto;
+    border-right: none;
+  }
+
+  .streamBackdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+    z-index: var(--z-modal, 200);
+  }
+
+  .streamPanel {
+    position: fixed;
+    z-index: var(--z-modal, 200);
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: min(92vw, 720px);
+    height: min(88vh, 640px);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(15, 23, 42, 0.35);
+  }
+}
+
+/* ── Mobile: flow with the document so AppLayout's bottom-nav padding clears
+   the fixed BottomNav (matches the Assessments page). The fixed-height,
+   internally-scrolling two-pane layout is desktop-only. ── */
+@media (max-width: 768px) {
+  .pageRoot {
+    height: auto;
+    min-height: 100%;
+    overflow: visible;
+  }
+
+  .listPanel {
+    overflow: visible;
+  }
+}
+
+/* ── Phone: stack the status badge & watch link onto their own row ── */
+@media (max-width: 600px) {
+  .sessionCard {
+    flex-wrap: wrap;
+  }
+
+  .cardRight {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    margin-top: 4px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-color, #e2e8f0);
+  }
+}
+
+/* ── Phone: popup fills the screen ── */
+@media (max-width: 600px) {
+  .streamPanel {
+    top: 0;
+    left: 0;
+    transform: none;
+    width: 100vw;
+    height: 100%;
+    height: 100dvh;
+    border-radius: 0;
+  }
+}

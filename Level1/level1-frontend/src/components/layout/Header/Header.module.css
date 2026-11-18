@@ -1,0 +1,49 @@
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.titleArea {
+  flex: 1;
+  min-width: 0;
+}
+
+.title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.subtitle {
+  font-size: 14px;
+  color: var(--text-tertiary);
+  margin-top: 4px;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+/* ── Mobile (sm: <640px) ──────────────────────────────────────────
+   Actions wrap to a new line and left-align beneath the title.
+   ─────────────────────────────────────────────────────────────── */
+@media (max-width: 639px) {
+  .header {
+    flex-direction: column;
+    gap: 12px;
+  }
+  .actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}

@@ -1,0 +1,245 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 4px;
+}
+
+/* ── Loading / error states ─────────────────────────────────────────────────── */
+.loadingWrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  padding: 3rem;
+}
+
+.errorWrap {
+  padding: 2rem;
+  text-align: center;
+  color: var(--error-500);
+}
+
+/* ── Profile card ────────────────────────────────────────────────────────────── */
+.profileCard {
+  background: var(--bg-elevated);
+  border: 1.5px solid var(--border-default);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+  padding: 24px 28px;
+}
+
+/* Avatar in column 1 spanning both rows; name on top-right, contacts beneath it.
+   On mobile the avatar drops to row 1 only and the contact row spans full width. */
+.profileInner {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 20px;
+  row-gap: 10px;
+  align-items: center;
+}
+
+.avatar {
+  grid-column: 1;
+  grid-row: 1 / 3;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.nameRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.name {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+/* ── Contact info row ────────────────────────────────────────────────────────── */
+.contactRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 20px;
+  row-gap: 8px;
+}
+
+.contactItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  min-width: 0;
+}
+
+.contactItem svg {
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+}
+
+/* ── Profile action buttons ──────────────────────────────────────────────────── */
+.profileActions {
+  flex-shrink: 0;
+  align-self: flex-start;
+}
+
+.actionsRow {
+  grid-column: 2;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-top: 2px;
+}
+
+.actionBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  background: var(--bg-muted);
+  border: 1.5px solid var(--border-default);
+}
+.actionBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.actionBtn:not(:disabled):hover {
+  border-color: transparent;
+}
+.resume:not(:disabled):hover {
+  background: var(--success-50, #f0fdf4);
+  color: var(--success-700, #15803d);
+}
+.danger:not(:disabled):hover {
+  background: var(--error-50, #fef2f2);
+  color: var(--color-error-600, #dc2626);
+}
+.reaccess:not(:disabled):hover {
+  background: var(--color-warning-50, #fffbeb);
+  color: var(--color-warning-700, #b45309);
+}
+
+/* ── Version control (in page header) ────────────────────────────────────────── */
+.versionControl {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.versionLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* ── Tabs area ───────────────────────────────────────────────────────────────── */
+.tabsArea {
+  min-width: 0;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   Responsive — Tablet (≤ 768px)
+   ══════════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .page {
+    gap: 12px;
+  }
+
+  .profileCard {
+    padding: 20px;
+    border-radius: var(--radius-lg);
+  }
+
+  .avatar {
+    width: 54px;
+    height: 54px;
+    font-size: 18px;
+  }
+
+  .name {
+    font-size: 18px;
+  }
+
+  .contactRow {
+    gap: 14px;
+  }
+
+  .contactItem {
+    font-size: 12.5px;
+  }
+
+  .profileActions {
+    display: none;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   Responsive — Mobile (≤ 480px)
+   ══════════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 480px) {
+  .page {
+    gap: 10px;
+  }
+
+  .profileCard {
+    padding: 16px;
+    border-radius: var(--radius-lg);
+  }
+
+  .profileInner {
+    column-gap: 12px;
+    row-gap: 12px;
+  }
+
+  /* Avatar sits beside the name + status only … */
+  .avatar {
+    grid-row: 1;
+    width: 48px;
+    height: 48px;
+    font-size: 16px;
+  }
+
+  .name {
+    font-size: 16px;
+  }
+
+  .nameRow {
+    gap: 8px;
+  }
+
+  /* … and the contacts drop below, spanning the full width from the card's left edge. */
+  .contactRow {
+    grid-column: 1 / -1;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .contactItem {
+    font-size: 12px;
+  }
+
+  .profileActions {
+    display: none;
+  }
+}

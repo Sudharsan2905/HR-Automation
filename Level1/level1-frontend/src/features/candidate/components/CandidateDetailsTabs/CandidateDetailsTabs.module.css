@@ -1,0 +1,1130 @@
+/* One merged card: the tab-bar header sits on top, a divider separates it from
+   the active panel content below — header and body share a single rounded card. */
+.panel {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-elevated);
+  border: 1.5px solid var(--border-default);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Merged card — holds the tab bar and the active panel as one rounded card. */
+.card {
+  background: var(--bg-elevated);
+  border: 1.5px solid var(--border-default);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Tab-bar header — top of the card, with a divider beneath separating it from
+   the panel content. Sticks beneath the app header while the panel scrolls. */
+.stickyNav {
+  position: sticky;
+  /* Pin just below the sticky AppHeader (64px) so the tab bar stays visible
+     as the panel content scrolls past it. */
+  top: var(--header-height);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  /* Opaque fill + matching top radius so scrolling content doesn't show
+     through the bar or poke past the card's rounded top corners. */
+  background: var(--bg-elevated);
+  border-top-left-radius: var(--radius-xl);
+  border-top-right-radius: var(--radius-xl);
+  border-bottom: 1.5px solid var(--border-default);
+}
+
+.tabBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  /* Fill the header row so the mobile 4-column grid spreads evenly instead of
+     bunching the icons on the left. */
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Underline-style tabs — no pill; the active tab is marked by an orange
+   underline that overlaps the header divider. Hover/active use brand orange. */
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1.5px; /* overlap the .stickyNav divider */
+  cursor: pointer;
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.tab:hover {
+  color: var(--brand-orange);
+}
+
+.tabActive {
+  color: var(--brand-orange);
+  font-weight: 600;
+  border-bottom-color: var(--brand-orange);
+}
+
+.tabContent {
+  display: flex;
+  flex-direction: column;
+  /* Bottom gap so the pinned action bar sits clear of the card's edge. */
+  padding: 20px 20px 28px;
+  /* Content grows with its data and the whole page scrolls; the .stickyNav
+     tab bar stays pinned beneath the app header via position: sticky. */
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+/* Shared empty-state message for tabs with no data (rounds, malpractice, screenshots).
+   Compact, fixed-height box that scrolls if needed rather than filling the viewport. */
+.emptyPlaceholder {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  overflow-y: auto;
+  padding: 32px 16px;
+  text-align: center;
+  font-size: 16px;
+  color: var(--text-tertiary);
+}
+
+/* ── Status summary (Over All tab) ───────────────────────────────────────── */
+.summary {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1; /* fill the tab panel so the action bar can pin to the bottom */
+}
+
+.statusCard {
+  /* Whole Over All block wrapped as a single card. */
+  padding: 20px;
+  background: var(--bg-elevated);
+  border: 1.5px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.06) 0px 1px 2px 0px;
+}
+
+.statusCardTitle {
+  margin: 0 0 14px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* 3 columns → the six stats fall naturally into the two rows described. */
+.statGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px 20px;
+  margin: 0;
+}
+
+.statItem {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.statLabel {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+}
+
+.statValue {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.statusPill {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  padding: 3px 11px;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.statusCompleted {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+/* ── Overview stats (Assessment Overview card) ───────────────────────────── */
+.overviewStats {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+  align-items: start;
+  margin-bottom: 16px;
+}
+
+.overviewStat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 0 16px;
+  border-right: 1.5px solid var(--border-default);
+  text-align: center;
+}
+
+.overviewStat:first-child {
+  padding-left: 0;
+}
+
+.overviewStat:last-child {
+  padding-right: 0;
+  border-right: none;
+}
+
+.overviewStatLabel {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.overviewIconValue {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.overviewIcon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-md);
+}
+
+.overviewCount {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.overviewDivider {
+  height: 1.5px;
+  background: var(--border-default);
+  margin: 0 0 16px;
+}
+
+.overviewMeta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+}
+
+.overviewMetaItem {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 16px;
+  border-right: 1.5px solid var(--border-default);
+}
+
+.overviewMetaItem:last-child {
+  border-right: none;
+}
+
+.overviewMetaIcon {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+}
+
+.overviewMetaLabel {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  margin-bottom: 3px;
+}
+
+.overviewMetaValue {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+@media (max-width: 768px) {
+  .overviewStats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .overviewMeta {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+}
+
+/* ── Monitoring overview stats (Monitoring Overview card) ────────────────── */
+.monitorStats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  align-items: center;
+  justify-items: center;
+  margin-bottom: 16px;
+}
+
+.monitorStat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-width: 0;
+  width: 100%;
+  padding: 0 16px;
+  border-right: 1.5px solid var(--border-default);
+  text-align: center;
+}
+
+.monitorStat:first-child {
+  padding-left: 0;
+}
+
+.monitorStat:last-child {
+  padding-right: 0;
+  border-right: none;
+}
+
+.monitorLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 768px) {
+  .monitorStats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+}
+
+.monitorMeta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+}
+
+@media (max-width: 768px) {
+  .monitorMeta {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+}
+
+/* ── Per-round cards (shown when > 1 round) ──────────────────────────────── */
+.roundCardsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.roundCard {
+  padding: 16px;
+  background: var(--bg-elevated);
+  border: 1.5px solid var(--border-default);
+  border-left-width: 3px;
+  border-radius: var(--radius-lg);
+  box-shadow: rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.06) 0px 1px 2px 0px;
+}
+
+.roundCardHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1.5px solid var(--border-default);
+}
+
+.roundCardName {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-right: auto;
+}
+
+.roundInfoRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border-subtle, var(--border-default));
+}
+
+.roundInfoRow:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.roundInfoIcon {
+  flex-shrink: 0;
+  display: inline-flex;
+  color: var(--text-tertiary);
+}
+
+.roundInfoLabel {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  min-width: 0;
+}
+
+.roundInfoValue {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* Action bar after the Over All + rounds cards. */
+.statusActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: auto; /* pin the action buttons to the bottom of the card */
+  padding-top: 16px;
+  border-top: 1.5px solid var(--border-default); /* divider above the action bar */
+}
+
+/* Tablet: two stats per row. */
+@media (max-width: 768px) {
+  .statGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .stickyNav {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+}
+
+/* Mobile: keep two stats per row, and lay the tabs out three per row with the
+   icon stacked above its label so the longer labels still fit. */
+@media (max-width: 480px) {
+  .statGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  /* Tighter panel padding on small screens (statusCard itself has none). */
+  .tabContent {
+    padding: 14px;
+  }
+
+  /* Icon-only tab bar — all four fit in a single row. */
+  .tabBar {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .tab {
+    justify-content: center;
+    gap: 0;
+    padding: 12px 0;
+  }
+
+  /* Hide the visible label; the button's aria-label keeps the accessible name. */
+  .tabLabel {
+    display: none;
+  }
+
+  /* Slightly larger glyph for a comfortable tap target. */
+  .tab svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  /* Stack the action buttons full-width. */
+  .statusActions {
+    flex-direction: column;
+  }
+
+  .statusActions > button {
+    width: 100%;
+  }
+}
+
+/* ── Rounds review (Rounds tab) ──────────────────────────────────────────── */
+.rounds {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Round sub-tabs row: round tabs on the left, PDF download on the right.
+   The divider lives on the row so it spans beneath both. On mobile the row
+   stacks (download above the tabs) via the breakpoint below. */
+.roundTabRow {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  border-bottom: 1.5px solid var(--border-default);
+}
+
+/* Round PDF download — round picker + download button, pushed to the right. */
+.roundDownloadBar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-left: auto;
+  /* Keep the button clear of the divider line. */
+  padding-bottom: 8px;
+}
+
+.downloadDropdown {
+  position: relative;
+  display: inline-flex;
+}
+
+.downloadMenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 20;
+  min-width: 160px;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+}
+
+.downloadMenuItem {
+  width: 100%;
+  padding: 8px 10px;
+  text-align: left;
+  font-size: 13px;
+  color: var(--text-primary);
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.downloadMenuItem:hover {
+  background: var(--bg-active);
+}
+
+/* Per-round sub-tabs — underline nav style (mirrors the main tab bar), sits
+   above the active round panel with a full-width divider beneath. */
+.roundTabBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* Mobile: stack the download above the round tabs (original layout). */
+@media (max-width: 768px) {
+  .roundTabRow {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .roundDownloadBar {
+    margin-left: 0;
+    padding-bottom: 0;
+  }
+}
+
+.roundTab {
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  /* Pull the underline down so it overlaps the bar's divider line. */
+  margin-bottom: -1.5px;
+  cursor: pointer;
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.roundTab:hover {
+  color: var(--brand-orange);
+}
+
+.roundTabActive {
+  color: var(--brand-orange);
+  font-weight: 600;
+  border-bottom-color: var(--brand-orange);
+}
+
+.round {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.roundHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.roundHeadInfo {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-width: 0;
+}
+
+.roundTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.roundMeta {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+}
+
+.questionList {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.questionCard {
+  background: var(--bg-elevated);
+  border: 1.5px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+}
+
+.questionHead {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+/* Correctness pill sits at the far right of the badge row. */
+.correctnessBadge {
+  margin-left: auto;
+}
+
+.questionText {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.questionImage {
+  display: block;
+  max-width: 100%;
+  max-height: 220px;
+  object-fit: contain;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+  margin-bottom: 10px;
+}
+
+/* ── MCQ options ──────────────────────────────────────────────────────────── */
+.optionList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  font-size: 14px;
+  color: var(--text-secondary);
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border-default);
+  border-radius: var(--radius-md);
+}
+
+.optionCorrect {
+  color: #15803d;
+  font-weight: 600;
+  background: var(--success-50, #f0fdf4);
+  border-color: #86efac;
+}
+
+.optionWrong {
+  color: #b91c1c;
+  font-weight: 600;
+  background: #fef2f2;
+  border-color: #fca5a5;
+}
+
+.optionDot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+}
+
+.optionDotCorrect {
+  background: var(--success-600, #16a34a);
+}
+
+.optionDotWrong {
+  background: #dc2626;
+}
+
+.optionText {
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.optionImage {
+  max-width: 120px;
+  max-height: 80px;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
+/* ── Candidate answer (MCQ footer) ───────────────────────────────────────── */
+.answerLine {
+  margin: 14px 0 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.answerLineLabel {
+  font-weight: 600;
+  color: var(--text-tertiary);
+}
+
+.answerCorrect {
+  color: #15803d;
+  font-weight: 600;
+}
+
+.answerWrong {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+/* ── Descriptive answers ─────────────────────────────────────────────────── */
+.textAnswers {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.answerBlock {
+  padding: 12px 14px;
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border-default);
+  border-radius: var(--radius-md);
+}
+
+.answerBlockCorrect {
+  background: var(--success-50, #f0fdf4);
+  border-color: #86efac;
+}
+
+.answerBlockLabel {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-tertiary);
+}
+
+.answerBlockCorrect .answerBlockLabel {
+  color: #15803d;
+}
+
+.answerBlockText {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+@media (max-width: 480px) {
+  .questionCard {
+    padding: 14px 14px;
+  }
+}
+
+/* ── Malpractice events (Malpractice tab) ────────────────────────────────── */
+.mpWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Horizontal scroll keeps the wide table usable on narrow viewports. */
+.mpTableScroll {
+  width: 100%;
+  overflow-x: auto;
+  border: 1.5px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+}
+
+.mpTable {
+  width: 100%;
+  min-width: 860px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.mpTable thead th {
+  text-align: left;
+  padding: 14px 16px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-tertiary);
+  border-bottom: 1.5px solid var(--border-default);
+  white-space: nowrap;
+}
+
+.mpTable tbody td {
+  padding: 12px 16px;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--border-default);
+  color: var(--text-secondary);
+}
+
+.mpTable tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.mpTable tbody tr:hover {
+  background: var(--bg-active);
+}
+
+.mpNo {
+  width: 40px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.mpType {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: var(--warning-600);
+  white-space: nowrap;
+}
+
+.mpType svg {
+  flex-shrink: 0;
+}
+
+.mpDesc {
+  min-width: 200px;
+  max-width: 300px;
+  line-height: 1.5;
+}
+
+.mpEmpty {
+  color: var(--text-tertiary);
+}
+
+/* Image thumbnail trigger — opens the preview modal. */
+.mpThumb {
+  display: inline-flex;
+  padding: 0;
+  overflow: hidden;
+  background: var(--bg-elevated);
+  border: 1.5px solid var(--border-default);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition:
+    border-color var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.mpThumb:hover {
+  border-color: var(--primary-400);
+  transform: scale(1.05);
+}
+
+.mpThumb img {
+  display: block;
+  width: 56px;
+  height: 44px;
+  object-fit: cover;
+}
+
+/* Circular button used for video (play) and audio. */
+.mpMediaBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: var(--radius-full);
+  color: var(--warning-600);
+  background: var(--warning-50);
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.mpMediaBtn:hover {
+  transform: scale(1.08);
+}
+
+.mpMediaBtnActive {
+  color: #fff;
+  background: var(--warning-600);
+}
+
+.mpTime {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  white-space: nowrap;
+}
+
+.mpDate {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.mpClock {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+/* Footer: result count + pager. */
+.mpFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.mpCount {
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+.mpPager {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mpPageNav,
+.mpPageBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 34px;
+  padding: 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border-default);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast),
+    background var(--transition-fast);
+}
+
+.mpPageNav:hover:not(:disabled),
+.mpPageBtn:hover {
+  color: var(--action-color);
+  border-color: var(--action-color);
+}
+
+.mpPageNav:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mpPageBtnActive {
+  color: #fff;
+  background: var(--action-color);
+  border-color: var(--action-color);
+}
+
+/* Media inside the preview modals. */
+.mpPreviewImage {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 70vh;
+  object-fit: contain;
+  border-radius: var(--radius-md);
+}
+
+.mpPreviewVideo {
+  display: block;
+  width: 100%;
+  max-height: 70vh;
+  background: #000;
+  border-radius: var(--radius-md);
+}
+
+@media (max-width: 480px) {
+  .mpFooter {
+    justify-content: center;
+  }
+}
+
+/* ── Screenshots gallery (Screenshots tab) ───────────────────────────────── */
+.screenshotGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+@media (max-width: 900px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.screenshotItem {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg-elevated);
+  border: 1.5px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.screenshotItem:hover {
+  border-color: var(--primary-400);
+  box-shadow: var(--shadow-md);
+}
+
+.screenshotButton {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.screenshotImage {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  background: var(--bg-muted);
+  border-bottom: 1.5px solid var(--border-default);
+  transition: transform var(--transition-fast);
+}
+
+.screenshotButton:hover .screenshotImage {
+  transform: scale(1.02);
+}
+
+.screenshotCaption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+}
+
+.screenshotRound {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.screenshotTime {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .screenshotGrid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px;
+  }
+}

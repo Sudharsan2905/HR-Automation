@@ -1,0 +1,173 @@
+:root {
+  /* Brand Colors */
+  --primary-50: #eff6ff;
+  --primary-100: #dbeafe;
+  --primary-200: #bfdbfe;
+  --primary-300: #93c5fd;
+  --primary-400: #60a5fa;
+  --primary-500: #3b82f6;
+  --primary-600: #2563ff;
+  --primary-700: #1d4ed8;
+  --primary-800: #1e40af;
+  --primary-900: #1e3a8a;
+
+  --accent-400: #a78bfa;
+  --accent-500: #8b5cf6;
+  --accent-600: #7c3aed;
+
+  /* Brand orange — echoes the logo gradient (#FF6C3A → #FF0042). Used for
+     selected / active accents (dropdown selection, view switcher). A touch
+     deeper than the logo's top stop so text stays legible on light tints. */
+  --brand-orange: #f4511e;
+  --brand-orange-soft: #fff1ec;
+
+  /* Logo accent — orange→red gradient taken from the app logo. */
+  --logo-color: #ff6c3a;
+  --logo-color-end: #ff0042;
+  --logo-gradient: linear-gradient(180deg, #ff6c3a 0%, #ff0042 100%);
+  --logo-tint: rgba(255, 108, 58, 0.1);
+
+  /* Primary action accent — primary buttons and pagination across every page. */
+  --action-color: #ff423d;
+  --action-color-hover: #e5352f;
+
+  --success-50: #f0fdf4;
+  --success-500: #22c55e;
+  --success-600: #16a34a;
+
+  --code-inline-bg: #e2e8f0;
+  --code-inline-color: #1e293b;
+  --option-correct-bg: #f0fdf4;
+  --option-correct-color: #16a34a;
+  --option-correct-border: #bbf7d0;
+
+  --warning-50: #fffbeb;
+  --warning-500: #f59e0b;
+  --warning-600: #d97706;
+
+  --error-50: #fef2f2;
+  --error-500: #ef4444;
+  --error-600: #dc2626;
+
+  /* Light Mode */
+  --bg-page: #f8fafc;
+  /* Page background gradient — applied to every page's content area + body. */
+  --bg-page-gradient: linear-gradient(135deg, #f7f2f2 0%, #fbf6f8 100%);
+  --bg-surface: #ffffff;
+  --bg-elevated: #ffffff;
+  --bg-muted: #f1f5f9;
+  --bg-hover: #f8fafc;
+  --bg-active: #eff6ff;
+
+  --border-default: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --border-focus: #2563ff;
+
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-tertiary: #94a3b8;
+  --text-disabled: #cbd5e1;
+  --text-inverse: #ffffff;
+  --text-brand: #2563ff;
+
+  /* Sidebar — Light Mode (white sidebar matching Figma) */
+  --sidebar-bg: #ffffff;
+  --sidebar-text: #64748b;
+  --sidebar-text-active: #1e293b;
+  --sidebar-item-hover: rgba(15, 23, 42, 0.05);
+  --sidebar-item-active: rgba(37, 99, 255, 0.08);
+  --sidebar-border: #e2e8f0;
+  --sidebar-active-text: var(--primary-700);
+  --sidebar-logo-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+
+  /* Shadows */
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+
+  /* Radius */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-base: 200ms ease;
+  --transition-slow: 300ms ease;
+
+  /* Layout */
+  --sidebar-width: 225px;
+  --sidebar-collapsed-width: 65px;
+  --header-height: 64px;
+
+  /* Z-index scale */
+  --z-sidebar: 100;
+  --z-header: 95;
+  --z-dropdown: 150;
+  --z-modal: 200;
+  --z-toast: 300;
+  --z-tooltip: 250;
+
+  /* Tooltip */
+  --tooltip-bg: #1e293b;
+  --tooltip-text: #f8fafc;
+  --tooltip-border: rgba(255, 255, 255, 0.06);
+}
+
+[data-theme="dark"] {
+  --bg-page: #0b0f19;
+  /* Keep dark mode solid — the light gradient would wash out the dark theme. */
+  --bg-page-gradient: #0b0f19;
+  --bg-surface: #1e293b;
+  --bg-elevated: #293548;
+  --bg-muted: #1e293b;
+
+  --code-inline-bg: #334155;
+  --code-inline-color: #93c5fd;
+  --option-correct-bg: rgba(34, 197, 94, 0.12);
+  --option-correct-color: #4ade80;
+  --option-correct-border: rgba(34, 197, 94, 0.3);
+  --bg-hover: #293548;
+  --bg-active: rgba(37, 99, 255, 0.15);
+
+  /* Brand orange — lightened for contrast on dark surfaces; soft tint
+     becomes a translucent orange so it reads on the darker background. */
+  --brand-orange: #ff7043;
+  --brand-orange-soft: rgba(244, 81, 30, 0.18);
+
+  --border-default: #334155;
+  --border-strong: #475569;
+  --border-focus: #3b82f6;
+
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-tertiary: #64748b;
+  --text-disabled: #475569;
+  --text-inverse: #0f172a;
+  --text-brand: #60a5fa;
+
+  /* Sidebar — Dark Mode (keeps the original dark sidebar) */
+  --sidebar-bg: #0b0f19;
+  --sidebar-text: #64748b;
+  --sidebar-text-active: #f1f5f9;
+  --sidebar-item-hover: rgba(255, 255, 255, 0.06);
+  --sidebar-item-active: rgba(37, 99, 255, 0.22);
+  --sidebar-border: rgba(255, 255, 255, 0.07);
+  --sidebar-active-text: var(--primary-400);
+  --sidebar-logo-shadow: none;
+
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.3), 0 1px 2px -1px rgb(0 0 0 / 0.3);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.4), 0 4px 6px -4px rgb(0 0 0 / 0.3);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.4);
+
+  /* Tooltip — dark mode: invert to light surface */
+  --tooltip-bg: #f1f5f9;
+  --tooltip-text: #0f172a;
+  --tooltip-border: rgba(0, 0, 0, 0.08);
+}
