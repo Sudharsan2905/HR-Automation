@@ -1,0 +1,4 @@
+fastapi
+uvicorn[standard]
+httpx
+websockets>=11.0

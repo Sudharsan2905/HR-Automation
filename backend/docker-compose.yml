@@ -1,0 +1,17 @@
+services:
+  backend:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - MONGO_URI=mongodb://host.docker.internal:27017
+      - LIVEKIT_URL=ws://host.docker.internal:7880
+      - LIVEKIT_CLIENT_URL=ws://192.168.14.48:7880
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./reports:/app/reports
+      - ./recordings:/app/recordings
+    restart: unless-stopped

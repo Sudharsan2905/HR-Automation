@@ -1,0 +1,53 @@
+# Bundled fonts (binary, download separately)
+*.ttf
+*.otf
+# Exception: Tamil font required for PDF generation
+!app/components/utils/templates/NotoSansTamil-Regular.ttf
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Environment variables
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude Code
+.claude/
+
+# LiveKit binary
+livekit-server.exe
+
+# SSL certs
+*.pem
+
+# Generated artifacts
+audio_cache/
+reports/
+reports.zip
+*.zip
+
+# Test output
+test_tamil_output.pdf
+
+# Recorded interviews (ENABLE_RECORDING)
+recordings/

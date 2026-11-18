@@ -1,0 +1,43 @@
+# Repo-wide ignores (backend/, frontend/ and proxy/ have their own .gitignore too)
+
+# Secrets / environment
+.env
+.env.*
+!.env.example
+
+# Dependencies and virtual environments
+node_modules/
+venv/
+.venv/
+
+# Python / build output
+__pycache__/
+*.py[cod]
+.next/
+dist/
+build/
+
+# Logs and temp files
+*.log
+*.tmp
+tmp/
+
+# Local tunnels / binaries
+ngrok*.log
+ngrok.yml
+livekit-server.exe
+
+# Generated at runtime
+reports/
+recordings/
+audio_cache/
+
+# Editors / OS
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Claude Code local files
+.claude/
+docs/.idea/

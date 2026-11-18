@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    @font-face { font-family: 'NotoSansTamil'; src: url('NotoSansTamil-Regular.ttf'); }
+    @page { margin: 40px 50px; }
+    body { font-family: 'NotoSansTamil', 'Noto Sans Tamil', 'Nirmala UI', 'Latha', 'Segoe UI', Arial, sans-serif; max-width: 780px; margin: 0 auto; padding: 0; color: #2c3e50; font-size: 13px; line-height: 1.5; }
+
+    /* Header */
+    .header { text-align: center; padding: 24px 0 16px; border-bottom: 3px solid #2c3e50; margin-bottom: 20px; }
+    .header img { height: 48px; margin-bottom: 8px; }
+    .header h1 { font-size: 22px; color: #2c3e50; margin: 6px 0 2px; letter-spacing: 0.5px; }
+    .header .subtitle { color: #95a5a6; font-size: 11px; font-style: italic; margin: 0; }
+
+    /* Info table */
+    .info-table { width: 100%; border-collapse: collapse; margin: 16px 0; border-radius: 6px; overflow: hidden; }
+    .info-table td { padding: 10px 14px; border-bottom: 1px solid #ecf0f1; font-size: 13px; }
+    .info-table tr:last-child td { border-bottom: none; }
+    .info-table td:first-child { background: #f7f9fb; font-weight: 600; width: 140px; color: #34495e; }
+    .info-table td:last-child { color: #555; }
+    .info-table { border: 1px solid #e0e4e8; }
+
+    /* Conversation */
+    .conversation { margin: 20px 0; }
+    .message { padding: 10px 16px; margin: 6px 0; border-radius: 8px; page-break-inside: avoid; }
+    .message .meta { font-size: 11px; color: #7f8c8d; margin-bottom: 4px; }
+    .message .role { font-weight: 600; }
+    .message .text { font-size: 13px; color: #2c3e50; }
+
+    .message.ai { background: #eaf4fe; border-left: 4px solid #2980b9; }
+    .message.ai .role { color: #2980b9; }
+
+    .message.candidate { background: #eafaf1; border-left: 4px solid #27ae60; }
+    .message.candidate .role { color: #27ae60; }
+
+    .message.interviewer { background: #f5eeff; border-left: 4px solid #7c3aed; }
+    .message.interviewer .role { color: #7c3aed; }
+
+    /* Footer */
+    .footer { text-align: center; padding: 16px 0 4px; margin-top: 30px; border-top: 2px solid #e0e4e8; }
+    .footer p { color: #b0b8c1; font-size: 10px; margin: 2px 0; }
+    .footer .brand { font-weight: 600; font-size: 12px; color: #7f8c8d; font-style: italic; }
+  </style>
+</head>
+<body>
+  <!-- Header with logo -->
+  <div class="header">
+    {% if logo_b64 %}
+    <img src="data:image/webp;base64,{{ logo_b64 }}" alt="Softsuave">
+    {% endif %}
+    <h1>{{ app_name }} — Interview Transcript</h1>
+    <p class="subtitle">Product by Softsuave AI team</p>
+  </div>
+
+  <!-- Info -->
+  <table class="info-table">
+    <tr><td>Candidate</td><td>{{ candidate_name }}</td></tr>
+    <tr><td>Interview Date</td><td>{{ interview_date }}</td></tr>
+    <tr><td>Domain</td><td>{{ domain }} / {{ domain_title }}</td></tr>
+    <tr><td>Total Messages</td><td>{{ total_messages }}</td></tr>
+  </table>
+
+  <!-- Conversation -->
+  <div class="conversation">
+    {% for msg in messages %}
+    <div class="message {{ msg.role }}">
+      <div class="meta">
+        <span class="role">{{ msg.role_label }}</span> &middot; {{ msg.timestamp }}
+      </div>
+      <div class="text">{{ msg.text }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <p class="brand">{{ app_name }}</p>
+    <p>Product by Softsuave AI team</p>
+    <p>{{ interview_date }}</p>
+  </div>
+</body>
+</html>
