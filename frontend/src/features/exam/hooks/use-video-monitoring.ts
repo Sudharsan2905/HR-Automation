@@ -7,9 +7,9 @@ const DETECTION_INTERVAL_MS = 700;
 const FACE_ABSENCE_THRESHOLD_MS = 3_000;
 const VIOLATION_COOLDOWN_MS = 15_000;
 const MIN_DETECTION_CONFIDENCE = 0.55;
-const MEDIAPIPE_WASM = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/wasm";
-const FACE_MODEL =
-  "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite";
+// Served from /public so the strict exam does not depend on a third-party CDN.
+const MEDIAPIPE_WASM = "/mediapipe/wasm";
+const FACE_MODEL = "/mediapipe/blaze_face_short_range.tflite";
 
 /** Face presence / multi-face detection via MediaPipe. Fails silently if the model can't load. */
 export function useVideoMonitoring({
@@ -83,11 +83,13 @@ export function useVideoMonitoring({
       try {
         const { FaceDetector, FilesetResolver } = await import("@mediapipe/tasks-vision");
         const vision = await FilesetResolver.forVisionTasks(MEDIAPIPE_WASM);
-        const d = await FaceDetector.createFromOptions(vision, {
-          baseOptions: { modelAssetPath: FACE_MODEL, delegate: "GPU" },
-          runningMode: "VIDEO",
-          minDetectionConfidence: MIN_DETECTION_CONFIDENCE,
-        });
+        const create = (delegate: "GPU" | "CPU") =>
+          FaceDetector.createFromOptions(vision, {
+            baseOptions: { modelAssetPath: FACE_MODEL, delegate },
+            runningMode: "VIDEO",
+            minDetectionConfidence: MIN_DETECTION_CONFIDENCE,
+          });
+        const d = await create("GPU").catch(() => create("CPU"));
         if (!running) {
           d.close();
           return;

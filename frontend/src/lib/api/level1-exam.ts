@@ -77,7 +77,7 @@ export const saveExamAnswer = (submissionId: string, questionId: string, answer:
   });
 
 export const startExamInterview = (submissionId: string) =>
-  apiClient.post<unknown, unknown>(`${BASE}/submission/${submissionId}/start`);
+  apiClient.post<unknown, unknown>(`${BASE}/submission/${submissionId}/start-round`);
 
 export const finishExamRound = (submissionId: string) =>
   apiClient.post<unknown, FinishRoundResponse>(`${BASE}/submission/${submissionId}/finish-round`);

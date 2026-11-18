@@ -183,6 +183,9 @@ export function SessionPage({ shareLink, submissionId }: { shareLink: string; su
 
   if (orch.phase < ExamPhase.ACTIVE)
     return (
+      <>
+        {/* a session on hold (or offline) must say so during setup too, not just mid-exam */}
+        <ConnectionOverlay status={s.networkStatus} />
       <ExamSetupScreen
         phase={orch.phase}
         phaseLabel={orch.phaseLabel}
@@ -199,6 +202,7 @@ export function SessionPage({ shareLink, submissionId }: { shareLink: string; su
           proctor.retryAudio();
         }}
       />
+      </>
     );
 
   const questions = round.questions;
