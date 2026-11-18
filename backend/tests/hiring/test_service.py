@@ -153,3 +153,12 @@ async def test_flow_record_creation_is_race_safe():
     jd = await make_ready_jd(admin)
     flows = await asyncio.gather(*(service._flow(str(jd.id)) for _ in range(6)))
     assert len({str(f.id) for f in flows}) == 1
+
+
+def test_iso_always_has_timezone():
+    from datetime import datetime, timezone
+
+    naive = datetime(2026, 1, 1, 12, 0, 0)
+    assert service._iso(naive).endswith("+00:00")
+    assert service._iso(datetime(2026, 1, 1, tzinfo=timezone.utc)).endswith("+00:00")
+    assert service._iso(None) is None

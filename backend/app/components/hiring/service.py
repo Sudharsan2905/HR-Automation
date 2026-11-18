@@ -349,7 +349,10 @@ async def _get_hc(hc_id: str) -> HiringCandidate:
 # --- Read models --------------------------------------------------------------
 
 def _iso(d: datetime | None) -> str | None:
-    return d.isoformat() if d else None
+    """ISO string that always carries a timezone (Mongo returns naive UTC datetimes)."""
+    if not d:
+        return None
+    return (d if d.tzinfo else d.replace(tzinfo=timezone.utc)).isoformat()
 
 
 async def _level2_view(hc: HiringCandidate) -> dict:
@@ -463,7 +466,7 @@ async def get_flow(jd_id: str) -> dict:
                         "assessment_id": assessment_id,
                         "steps": run.get("steps", []), "events": run.get("events", [])} if run else None),
         "candidates": cands,
-        "events": [{"ts": e.ts.isoformat(), "stage": e.stage, "level": e.level, "message": e.message} for e in events],
+        "events": [{"ts": _iso(e.ts), "stage": e.stage, "level": e.level, "message": e.message} for e in events],
     }
 
 
@@ -476,7 +479,7 @@ async def list_flows(user: User) -> list[dict]:
         l1_done = sum(1 for h in hcs if h.level1_status in ("passed", "failed", "terminated"))
         l2_done = sum(1 for h in hcs if h.level2_interview_id)
         stage = "level2" if l2_done else "level1" if hcs else "sourcing" if jd.analysis_status == "done" else "jd"
-        out.append({"jd_id": jd_id, "title": jd.title, "created_at": jd.created_at.isoformat(),
+        out.append({"jd_id": jd_id, "title": jd.title, "created_at": _iso(jd.created_at),
                     "candidate_count": len(hcs), "stage_summary": {"level1_done": l1_done, "level2_done": l2_done},
                     "current_stage": stage})
     return out

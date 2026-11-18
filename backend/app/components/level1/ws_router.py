@@ -75,8 +75,8 @@ async def interview_websocket(websocket: WebSocket, submission_id: str) -> None:
         await websocket.close(code=4003, reason="Session already ended")
         return
     await manager.connect(submission_id, websocket)
-    await _send_initial_state(websocket, sub)
     try:
+        await _send_initial_state(websocket, sub)
         while True:
             data = await websocket.receive_json()
             if data.get("type") == "ping":
