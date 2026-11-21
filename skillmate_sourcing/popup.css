@@ -1,0 +1,107 @@
+/* Matches SkillMate's web UI: shadcn "neutral" theme, Geist-style type, 10px radius,
+   and the cyan "Mate" accent (#00e5ff). Values mirror frontend/src/app/globals.css. */
+:root {
+  --background: #ffffff;
+  --foreground: #0a0a0a;      /* oklch(0.145 0 0) */
+  --card: #ffffff;
+  --muted: #f5f5f5;           /* oklch(0.97 0 0) */
+  --muted-foreground: #737373;/* oklch(0.556 0 0) */
+  --primary: #171717;         /* oklch(0.205 0 0) */
+  --primary-foreground: #fafafa;
+  --border: #e5e5e5;          /* oklch(0.922 0 0) */
+  --ring: #a1a1a1;
+  --destructive: #e7000b;     /* oklch(0.577 0.245 27.3) */
+  --accent-cyan: #00e5ff;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --radius: 10px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  width: 340px;
+  margin: 0;
+  background: var(--muted);
+  color: var(--foreground);
+  font: 13px/1.45 "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  background: var(--background);
+  border-bottom: 1px solid var(--border);
+}
+.wordmark { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
+.cyan { color: var(--accent-cyan); }
+.tagline { margin: 0; font-size: 10px; font-style: italic; color: var(--muted-foreground); }
+
+.stack { display: flex; flex-direction: column; gap: 10px; padding: 12px; }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+.card__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.card__title { margin: 0; font-size: 13px; font-weight: 600; }
+
+p { margin: 0 0 8px; }
+.muted { color: var(--muted-foreground); }
+.small { font-size: 11px; }
+.strong { font-weight: 600; }
+.mono { font-family: ui-monospace, "Geist Mono", SFMono-Regular, Menlo, monospace; font-size: 11px; word-break: break-all; }
+.hidden { display: none !important; }
+.row { display: flex; gap: 6px; }
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.badge--muted { background: var(--muted); color: var(--muted-foreground); }
+.badge--success { background: #dcfce7; color: #166534; }
+.badge--warning { background: #fef3c7; color: #92400e; }
+.badge--error { background: #fee2e2; color: #991b1b; }
+.badge--live { background: #cffafe; color: #155e75; }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: calc(var(--radius) - 2px);
+  border: 1px solid transparent;
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+.btn:disabled { opacity: 0.5; cursor: default; }
+.btn:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+.btn--block { width: 100%; }
+.btn--primary { background: var(--primary); color: var(--primary-foreground); }
+.btn--primary:hover:not(:disabled) { opacity: 0.9; }
+.btn--outline { background: var(--background); border-color: var(--border); color: var(--foreground); }
+.btn--outline:hover:not(:disabled) { background: var(--muted); }
+.btn--ghost { background: transparent; color: var(--foreground); }
+.btn--ghost:hover:not(:disabled) { background: var(--muted); }
+.btn--destructive { background: var(--destructive); color: #fff; }
+.btn--destructive:hover:not(:disabled) { opacity: 0.9; }
+
+.progress { height: 6px; background: var(--muted); border-radius: 999px; overflow: hidden; margin: 2px 0 8px; }
+.progress__bar { height: 100%; width: 0; background: var(--accent-cyan); transition: width 0.3s; }
+
+.footer { padding: 0 14px 12px; font-size: 11px; color: var(--muted-foreground); }

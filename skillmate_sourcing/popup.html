@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>SkillMate Sourcing</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <header class="header">
+    <div>
+      <div class="wordmark">Skill<span class="cyan">Mate</span></div>
+      <p class="tagline">Naukri Sourcing · <span id="version"></span></p>
+    </div>
+    <span id="run-dot" class="badge badge--muted">Idle</span>
+  </header>
+
+  <main class="stack">
+    <!-- SkillMate -->
+    <section class="card">
+      <div class="card__head">
+        <h2 class="card__title">SkillMate</h2>
+        <span id="sm-badge" class="badge badge--muted">Checking…</span>
+      </div>
+      <p class="muted mono" id="sm-url"></p>
+      <button id="btn-open-sm" class="btn btn--outline btn--block">Open SkillMate Sourcing</button>
+    </section>
+
+    <!-- Naukri ResDex -->
+    <section class="card">
+      <div class="card__head">
+        <h2 class="card__title">Naukri ResDex</h2>
+        <span id="rd-badge" class="badge badge--muted">Not checked</span>
+      </div>
+      <p id="rd-msg" class="muted">Check whether you're logged in. This opens no profile and uses no credits.</p>
+      <div class="row">
+        <button id="btn-check" class="btn btn--outline">Check login</button>
+        <button id="btn-open-rd" class="btn btn--ghost">Open ResDex</button>
+      </div>
+    </section>
+
+    <!-- Current run -->
+    <section class="card">
+      <div class="card__head">
+        <h2 class="card__title">Current run</h2>
+      </div>
+      <div id="run-active" class="hidden">
+        <p id="run-stage" class="strong"></p>
+        <div class="progress"><div id="run-bar" class="progress__bar"></div></div>
+        <p id="run-meta" class="muted"></p>
+        <button id="btn-stop" class="btn btn--destructive btn--block">Stop run</button>
+      </div>
+      <div id="run-idle">
+        <p class="muted">No run in progress. Start one from a JD in SkillMate → Sourcing → <b>Source from Naukri</b>.</p>
+        <p id="run-last" class="muted small hidden"></p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">Keep a ResDex results tab open while a run is in progress.</footer>
+
+  <script src="config.js"></script>
+  <script src="core.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
