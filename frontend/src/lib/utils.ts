@@ -49,14 +49,6 @@ export function decodeJwt(token: string): JwtPayload | null {
   }
 }
 
-/** Normalises the candidate JWT `scope` claim to "l1" (AI exam) or "l2" (voice interview). */
-export function candidateScope(scope: string | string[] | undefined | null): "l1" | "l2" | "" {
-  const raw = (Array.isArray(scope) ? scope.join(" ") : scope || "").toLowerCase();
-  if (/(^|[^a-z0-9])(l2|level2|level_2|level-2|2)([^a-z0-9]|$)/.test(raw)) return "l2";
-  if (/(^|[^a-z0-9])(l1|level1|level_1|level-1|1)([^a-z0-9]|$)/.test(raw)) return "l1";
-  return "";
-}
-
 const UMBRELLA_LABELS: Record<string, string> = { tech: "Tech", bde: "BDE", hr: "HR" };
 
 export function umbrellaLabel(key: string) {

@@ -7,7 +7,6 @@ from app.components.auth.schemas import (
     CandidateLoginRequest,
     CandidateLinkRequest,
     LoginRequest,
-    RegenerateKeyByEmailRequest,
 )
 from app.components.common.schemas import Role
 
@@ -22,7 +21,7 @@ async def login(req: LoginRequest):
 
 @router.post("/candidate/login")
 async def candidate_login(req: CandidateLoginRequest):
-    """Candidate login: the access key selects Level 1 or Level 2."""
+    """Candidate login with the Level 1 access key."""
     return await service.login_candidate(req)
 
 
@@ -45,24 +44,6 @@ async def list_candidates(user: User = Depends(require_role(Role.INTERVIEWER))):
         {"id": str(c.id), "email": c.email, "full_name": c.full_name}
         for c in candidates
     ]
-
-
-@router.post("/candidate/regenerate-key")
-async def regenerate_key_by_email(
-    req: RegenerateKeyByEmailRequest,
-    _user: User = Depends(require_role(Role.INTERVIEWER)),
-):
-    """Regenerate access key for a candidate by email — works regardless of who originally linked them."""
-    return await service.regenerate_access_key_by_email(req.email)
-
-
-@router.post("/candidate/{candidate_id}/regenerate-key")
-async def regenerate_key(
-    candidate_id: str,
-    user: User = Depends(require_role(Role.INTERVIEWER)),
-):
-    """Regenerate access key for a candidate by ID (legacy)."""
-    return await service.regenerate_access_key(candidate_id, str(user.id))
 
 
 @router.delete("/candidate/{candidate_id}")

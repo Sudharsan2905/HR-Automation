@@ -21,14 +21,9 @@ def _sourcing_models() -> list:
 
 def _hiring_models() -> list:
     from app.components.auth.blacklist import BlacklistedToken
-    from app.components.evaluation.models import EvaluationResult
     from app.components.hiring.models import HiringCandidate, HiringEvent, HiringFlow
-    from app.components.interview.models import Interview
-    from app.components.jd_interview.models import JdInterview, JdReport
-    from app.components.question_set.models import QuestionSet
 
-    return [BlacklistedToken, HiringFlow, HiringCandidate, HiringEvent, Interview, QuestionSet, JdInterview, JdReport,
-            EvaluationResult]
+    return [BlacklistedToken, HiringFlow, HiringCandidate, HiringEvent]
 
 
 @pytest_asyncio.fixture(autouse=True)

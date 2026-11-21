@@ -8,7 +8,7 @@ class LoginRequest(BaseModel):
 
 
 class CandidateLoginRequest(BaseModel):
-    """Candidate login with the access key for Level 1 or Level 2."""
+    """Candidate login with the Level 1 access key."""
     email: EmailStr
     access_key: str
 
@@ -17,11 +17,6 @@ class CandidateLinkRequest(BaseModel):
     """Add a candidate (e.g. sourced from Naukri) to the candidate list."""
     email: EmailStr
     full_name: str
-
-
-class RegenerateKeyByEmailRequest(BaseModel):
-    """Regenerate candidate access key by email."""
-    email: EmailStr
 
 
 class TokenResponse(BaseModel):

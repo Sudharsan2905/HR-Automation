@@ -33,18 +33,6 @@ async def resend_level1(hc_id: str, _user: User = Depends(_admin)):
     return await service.resend_level1(hc_id)
 
 
-@router.post("/candidates/{hc_id}/promote")
-async def promote(hc_id: str, _user: User = Depends(_admin)):
-    """Admin override: schedule Level 2 regardless of the Level 1 score."""
-    return await service.promote_manually(hc_id)
-
-
-@router.post("/candidates/{hc_id}/level2/resend-key")
-async def resend_level2_key(hc_id: str, _user: User = Depends(_admin)):
-    """Issue and email a new Level 2 access key."""
-    return await service.resend_level2_key(hc_id)
-
-
 @router.post("/jds/{jd_id}/level1/recheck")
 async def recheck_level1(jd_id: str, _user: User = Depends(_admin)):
     """Process Level 1 exams that finished scoring but were not finalized."""

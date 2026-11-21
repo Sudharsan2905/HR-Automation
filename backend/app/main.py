@@ -17,9 +17,6 @@ async def lifespan(app: FastAPI):
     from app.components.auth.blacklist import ensure_ttl_index
     from app.components.utils.email_client import init_email_client
     from app.components.utils.llm_client import init_llm_client
-    from app.components.utils.tts_client import init_tts_client
-    from app.components.utils.stt_client import init_stt_client
-    from app.components.utils.livekit_service import init_livekit_service
 
     log.info("Starting %s...", settings.APP_NAME)
     await init_db()
@@ -27,24 +24,15 @@ async def lifespan(app: FastAPI):
 
     init_llm_client()
     init_email_client()
-    init_tts_client()
-    init_stt_client()
-    init_livekit_service()
 
     await ensure_ttl_index()
     log.info("All singletons initialized")
 
     yield
 
-    from app.components.session.service import cleanup_all_bots
     from app.components.utils.llm_client import get_llm_client
-    from app.components.utils.tts_client import get_tts_client
-    from app.components.utils.stt_client import get_stt_client
-    from app.components.utils.livekit_service import get_livekit_service
 
-    await cleanup_all_bots()
-
-    for close_fn in (get_llm_client, get_tts_client, get_stt_client, get_livekit_service):
+    for close_fn in (get_llm_client,):
         try:
             await close_fn().close()
         except Exception:
@@ -89,24 +77,12 @@ app.add_middleware(GlobalResponseMiddleware)
 register_exception_handlers(app)
 
 # Routers
-from app.components.common.routes import router as discovery_router
 from app.components.auth.routes import router as auth_router
 from app.components.hiring.routes import router as hiring_router
-from app.components.interview.routes import router as interview_router
-from app.components.session.routes import router as session_router
-from app.components.evaluation.routes import router as evaluation_router
-from app.components.question_set.routes import router as question_set_router
-from app.components.jd_interview.routes import router as jd_interview_router
 from app.components.sourcing.routes import router as sourcing_router
 from app.components.level1.routes import router as level1_router
 
-app.include_router(discovery_router, prefix="/api")
 app.include_router(auth_router, prefix="/api")
 app.include_router(hiring_router, prefix="/api")
-app.include_router(interview_router, prefix="/api")
-app.include_router(session_router, prefix="/api")
-app.include_router(evaluation_router, prefix="/api")
-app.include_router(question_set_router, prefix="/api")
-app.include_router(jd_interview_router, prefix="/api")
 app.include_router(sourcing_router, prefix="/api")
 app.include_router(level1_router, prefix="/api")

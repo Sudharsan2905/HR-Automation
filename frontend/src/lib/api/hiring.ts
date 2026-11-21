@@ -13,12 +13,6 @@ export const startLevel1 = (jdId: string) =>
 export const resendLevel1 = (hcId: string) =>
   apiClient.post<unknown, { sent: boolean }>(`/hiring/candidates/${hcId}/level1/resend`, {});
 
-export const promoteCandidate = (hcId: string) =>
-  apiClient.post<unknown, { interview_id: string }>(`/hiring/candidates/${hcId}/promote`, {});
-
-export const resendLevel2Key = (hcId: string) =>
-  apiClient.post<unknown, { sent: boolean }>(`/hiring/candidates/${hcId}/level2/resend-key`, {});
-
 export const getLevel1Submission = (assessmentId: string, submissionId: string) =>
   apiClient.get<unknown, Level1SubmissionReview>(
     `/level1/assessments/${assessmentId}/submissions/${submissionId}`,

@@ -19,7 +19,7 @@ export interface TokenResponse {
 export interface JwtPayload {
   sub: string;
   role: Role;
-  /** Candidate tokens: "l1" (AI exam) or "l2" (voice interview). */
+  /** Candidate tokens carry scope "l1" (the AI exam). */
   scope?: string | string[];
   email: string;
   full_name?: string;

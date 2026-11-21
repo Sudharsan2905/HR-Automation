@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageSkeleton } from "@/components/shared/loading-skeleton";
 import { listHiringFlows } from "@/lib/api/hiring";
-import { Briefcase, Users, ClipboardCheck, Mic, Plus } from "lucide-react";
+import { Briefcase, Users, ClipboardCheck, Plus } from "lucide-react";
 import { toast } from "sonner";
 import type { HiringFlowSummary } from "@/types/hiring";
 
@@ -29,7 +29,6 @@ export default function DashboardPage() {
     { label: "Open JDs", value: flows.length, icon: Briefcase },
     { label: "Candidates", value: flows.reduce((a, f) => a + f.candidate_count, 0), icon: Users },
     { label: "Level 1 done", value: flows.reduce((a, f) => a + f.stage_summary.level1_done, 0), icon: ClipboardCheck },
-    { label: "Level 2 done", value: flows.reduce((a, f) => a + f.stage_summary.level2_done, 0), icon: Mic },
   ];
 
   return (
@@ -44,7 +43,7 @@ export default function DashboardPage() {
         }
       />
 
-      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 grid-cols-2 lg:grid-cols-3">
         {stats.map((s) => (
           <Card key={s.label} className="rounded-xl border border-zinc-200 bg-gradient-to-br from-zinc-50/80 via-white to-slate-50 shadow-sm">
             <CardContent className="px-4 pt-4 pb-3">
@@ -70,7 +69,7 @@ export default function DashboardPage() {
                   <CardContent className="space-y-1 p-4">
                     <p className="truncate font-semibold">{f.title}</p>
                     <p className="text-xs text-muted-foreground">
-                      {f.candidate_count} candidates · L1 done {f.stage_summary.level1_done} · L2 done {f.stage_summary.level2_done}
+                      {f.candidate_count} candidates · L1 done {f.stage_summary.level1_done}
                     </p>
                   </CardContent>
                 </Card>

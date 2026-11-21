@@ -4,24 +4,18 @@ import type { NextRequest } from "next/server";
 const publicPaths = ["/", "/login"];
 
 const rolePaths: Record<string, string[]> = {
-  super_admin: ["/dashboard", "/hiring", "/evaluations", "/interviews"],
-  candidate: ["/exam", "/interview"],
+  super_admin: ["/dashboard", "/hiring"],
+  candidate: ["/exam"],
 };
 
 const roleHome: Record<string, string> = {
   super_admin: "/dashboard",
-  candidate: "/interview/lobby",
+  candidate: "/exam",
 };
-
-function homeFor(role: string, scope: string | undefined) {
-  if (role === "candidate" && scope === "l1") return "/exam";
-  return roleHome[role];
-}
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const role = request.cookies.get("skillmate-role")?.value;
-  const scope = request.cookies.get("skillmate-scope")?.value;
 
   // The exam pages show their own access-key form, so they are open to everyone.
   if (pathname === "/exam" || pathname.startsWith("/exam/")) {
@@ -30,7 +24,7 @@ export function proxy(request: NextRequest) {
 
   if (publicPaths.includes(pathname)) {
     if (role && roleHome[role]) {
-      return NextResponse.redirect(new URL(homeFor(role, scope), request.url));
+      return NextResponse.redirect(new URL(roleHome[role], request.url));
     }
     return NextResponse.next();
   }
@@ -42,7 +36,7 @@ export function proxy(request: NextRequest) {
   const allowed = rolePaths[role] || [];
   const hasAccess = allowed.some((p) => pathname === p || pathname.startsWith(p + "/"));
   if (!hasAccess) {
-    return NextResponse.redirect(new URL(homeFor(role, scope), request.url));
+    return NextResponse.redirect(new URL(roleHome[role], request.url));
   }
 
   return NextResponse.next();

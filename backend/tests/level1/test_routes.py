@@ -65,7 +65,7 @@ async def test_exam_endpoints_reject_non_l1_tokens(client):
     url = f"/api/level1/exam/assessment/{built['share_link']}"
     async with client as c:
         assert (await c.get(url)).status_code in (401, 403)
-        assert (await c.get(url, headers=token(user, "l2"))).status_code == 403
+        assert (await c.get(url, headers=token(user, "other"))).status_code == 403
         assert (await c.get(url, headers=token(admin))).status_code == 403
 
 

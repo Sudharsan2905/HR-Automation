@@ -1,24 +1,26 @@
 # SkillMate + Level 1 merge: process
 
+> **Update:** the Level 2 voice interview (LiveKit, TTS/STT, evaluation and PDF reports, question sets, the interview/evaluation dashboard pages and the candidate interview pages) has been removed. The flow now ends at the Level 1 result email. The sections below are kept as the original merge record; read every mention of Level 2 or LiveKit as removed.
+
 Goal: one product (SkillMate) with one login, one backend, one frontend. Level 1 (AI-generated
-exam) becomes a module inside SkillMate; Level 2 is SkillMate's existing voice interview.
+exam) becomes a module inside SkillMate; Level 2 (SkillMate's former voice interview) has since been removed.
 
 ## Target flow
 1. **JD submitted** in SkillMate Sourcing (exists): JD analysis -> search plan -> Naukri ResDex via the browser extension -> screened/scored profiles.
 2. **Approval = SkillMate's existing "selected" profile status** (decision: no separate meeting step). Selecting profiles starts Level 1.
 3. **Level 1** (from our app): for the selected profiles, the Talent Orchestrator agents run for the approved profiles (analysis -> shared 20 questions -> assessment -> invites). Candidates take the proctored exam; MCQs scored in Python, essays by the LLM; result email only after every answer is evaluated.
-4. **Level 2** (exists): candidates scoring **above 75%** in Level 1 are assigned automatically (decision) via `jd-interviews/{id}/assign` -> LiveKit session -> evaluation + PDF report. Pass mark: `LEVEL1_PASS_PERCENT=75`, strictly greater than (exactly 75% does not advance), configurable.
+4. **Result**: a Level 1 score **above 75%** is recorded as passed (`LEVEL1_PASS_PERCENT=75`, strictly greater than, configurable), otherwise failed; the candidate gets the result email and no further round is scheduled. *(Level 2 was removed.)*
 5. Admin sees both levels per candidate in one place.
 
 ## What exists vs what is new
 | Piece | Status |
 |---|---|
 | Sourcing (JD -> profiles) | exists in SkillMate |
-| Level 2 voice interview | exists in SkillMate |
+| Level 2 voice interview | removed |
 | Login | SkillMate: super admin from env, interviewers via Softsuave ERP, candidates by email + access key |
 | Level 1 exam, agents, scoring, proctoring | in level1-backend / level1-frontend; to be ported |
 | Approval | reuse sourcing `selected` status (no new meeting entity) |
-| Level progression (L1 -> L2) | NEW: automatic by pass mark |
+| Level progression (L1 -> L2) | removed with Level 2 |
 
 ## Phases (each one is reviewable and leaves SkillMate working)
 **Phase 0 - Safety.** New branch in `SkillMate` git (`feature/level1-merge`). Leave `level1-*` untouched until the end. Run the existing SkillMate sourcing tests as a baseline.
@@ -37,9 +39,9 @@ exam) becomes a module inside SkillMate; Level 2 is SkillMate's existing voice i
 - One user base for both levels (decision): Level 1 candidates are SkillMate `users` (role candidate) and use SkillMate's candidate login (email + access key). No temp passwords. Open point: SkillMate keys are single use; proposed default is a key reusable until the exam is completed, so reconnects work.
 
 **Phase 3 - Flow (new code).**
-- `hiring` record linking: sourcing JD -> selected profiles -> Level 1 run -> Level 2 interview -> results.
+- `hiring` record linking: sourcing JD -> selected profiles -> Level 1 run -> results.
 - Selecting a profile (existing `_promote`/`link_candidate`) triggers a Level 1 run for the selected profiles, using profile text + screening data instead of resume uploads and the profile's contact email.
-- When a Level 1 result is final (all answers evaluated), compare with the pass mark setting: above 75% -> create the Level 2 interview through SkillMate's existing `assign`; below -> mark not advanced. Both outcomes recorded and emailed.
+- When a Level 1 result is final (all answers evaluated), compare with the pass mark setting: above 75% -> mark passed; otherwise failed. Both outcomes recorded and emailed.
 - Unified candidate timeline and results view.
 
 **Phase 4 - Frontend port (Next.js 16 App Router, Tailwind v4 + shadcn, zustand).**
@@ -53,10 +55,10 @@ exam) becomes a module inside SkillMate; Level 2 is SkillMate's existing voice i
 **Phase 6 - Cleanup.** After the merged app passes verification: delete `level1-backend`, `level1-frontend` (asks you first), remove Talentia/level1 naming, update READMEs and the `.env.example`.
 
 ## Environment variables
-**Reuse as is:** `JWT_SECRET_KEY`, `JWT_ALGORITHM`, `CORS_ORIGINS`, `OPENAI_API_KEY`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`.
-**Same value, SkillMate's name:** `MONGODB_URL`->`MONGO_URI`, `DATABASE_NAME`->`MONGO_DB_NAME` (use `skill_mate`), `ACCESS_TOKEN_EXPIRE_MINUTES`->`JWT_ACCESS_TOKEN_EXPIRE_MINUTES`, `LIVEKIT_HOST`->`LIVEKIT_URL`, `FRONTEND_URL`->`APP_URL`, `APP_NAME`.
+**Reuse as is:** `JWT_SECRET_KEY`, `JWT_ALGORITHM`, `CORS_ORIGINS`, `OPENAI_API_KEY`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, (LiveKit keys were dropped with Level 2).
+**Same value, SkillMate's name:** `MONGODB_URL`->`MONGO_URI`, `DATABASE_NAME`->`MONGO_DB_NAME` (use `skill_mate`), `ACCESS_TOKEN_EXPIRE_MINUTES`->`JWT_ACCESS_TOKEN_EXPIRE_MINUTES`, `FRONTEND_URL`->`APP_URL`, `APP_NAME`.
 **Add to SkillMate settings:** `SMTP_FROM` (SkillMate only has a display name), `OPENAI_QUESTION_MODEL`, `OPENAI_ANALYSIS_MODEL`, `PIPELINE_CONCURRENCY`, `PIPELINE_MAX_FILE_MB`, `LEVEL1_PASS_PERCENT` (default 75, candidates must score above it). Files use local disk like SkillMate (decision), so no AWS keys.
-**Needed from you (not in my env files):** `SUPER_ADMIN_EMAIL`, `SUPER_ADMIN_PASSWORD` (backend will not start without them), `ERP_BASE_URL` / `ERP_SECRET_KEY` for interviewer login, a running LiveKit server for Level 2 (and Level 1 live monitoring), `LIVEKIT_CLIENT_URL` if the browser URL differs.
+**Needed from you (not in my env files):** `SUPER_ADMIN_EMAIL`, `SUPER_ADMIN_PASSWORD` (backend will not start without them), `ERP_BASE_URL` / `ERP_SECRET_KEY` for interviewer login, (no LiveKit server is needed any more).
 **Drop:** `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `REFRESH_TOKEN_EXPIRE_DAYS`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `S3_BUCKET_NAME`, `VITE_*`.
 Warning: same `JWT_SECRET_KEY` is fine once there is one backend; do not reuse it across separate deployments.
 
@@ -69,4 +71,4 @@ Warning: same `JWT_SECRET_KEY` is fine once there is one backend; do not reuse i
 - Naukri extension: Terms-of-service/credit cost is outside this work; the extension stays as is.
 
 ## Verification
-Backend `pytest` (SkillMate + ported Level 1); frontend `npm run lint` + `npm run build`; end-to-end on localhost: login -> JD -> sourcing -> select profiles -> Level 1 invite email -> candidate logs in with key -> exam -> evaluated report email -> automatic Level 2 assignment when above the pass mark.
+Backend `pytest` (SkillMate + ported Level 1); frontend `npm run lint` + `npm run build`; end-to-end on localhost: login -> JD -> sourcing -> select profiles -> Level 1 invite email -> candidate logs in with key -> exam -> evaluated report email -> result recorded as passed/failed.

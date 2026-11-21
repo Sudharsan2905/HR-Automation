@@ -4,7 +4,7 @@
     SkillMate all-in-one launcher with ngrok public URL.
 
 .DESCRIPTION
-    Starts (in order): ngrok -> LiveKit -> Backend -> Frontend -> Proxy
+    Starts (in order): ngrok -> Backend -> Frontend -> Proxy
     Gets the ngrok HTTPS URL first, updates backend/.env, then starts
     all services so they boot with the correct public URL already in config.
 
@@ -17,7 +17,6 @@
     Ports used:
       8000  FastAPI backend
       3000  Next.js frontend
-      7880  LiveKit server
       8080  Proxy (the one exposed via ngrok)
 #>
 
@@ -32,7 +31,6 @@ $ENV_FILE  = "$BE_DIR\.env"
 $PROXY_PORT = 8080
 $BE_PORT    = 8000
 $FE_PORT    = 3000
-$LK_PORT    = 7880
 
 $allProcs = [System.Collections.Generic.List[System.Diagnostics.Process]]::new()
 
@@ -107,13 +105,6 @@ Write-Step "Checking prerequisites..."
 }
 Write-Ok "python / node / ngrok found"
 
-if (-not (Test-Path "$BE_DIR\livekit-server.exe")) {
-    Write-Fail "livekit-server.exe not found in $BE_DIR"
-    Write-Host "  Download from: https://github.com/livekit/livekit/releases/tag/v1.9.12" -ForegroundColor Yellow
-    exit 1
-}
-Write-Ok "livekit-server.exe present"
-
 if (-not (Test-Path "$FE_DIR\node_modules")) {
     Write-Warn "node_modules not found - running npm install in frontend..."
     Push-Location $FE_DIR
@@ -181,7 +172,6 @@ Write-Step "Updating $ENV_FILE..."
 $envContent = Get-Content $ENV_FILE -Raw
 
 $envContent = [regex]::Replace($envContent, '(?m)^APP_URL=.*',            "APP_URL=$ngrokUrl")
-$envContent = [regex]::Replace($envContent, '(?m)^LIVEKIT_CLIENT_URL=.*', "LIVEKIT_CLIENT_URL=$ngrokUrl/livekit")
 $envContent = [regex]::Replace($envContent, '(?m)^CORS_ORIGINS=.*',
     "CORS_ORIGINS=[`"http://localhost:$FE_PORT`",`"$ngrokUrl`"]")
 
@@ -190,12 +180,6 @@ $envContent = [regex]::Replace($envContent, '(?m)^CORS_ORIGINS=.*',
 Write-Ok ".env updated"
 
 # ---------- Step 3: launch services ------------------------------------------
-
-Write-Step "Starting LiveKit server..."
-Start-Window -Title "LiveKit" `
-    -WorkDir $BE_DIR `
-    -Command "livekit-server.exe --config livekit.yaml --bind 0.0.0.0"
-if (Wait-Port -Port $LK_PORT -MaxSeconds 30 -Name "LiveKit") { Write-Ok "LiveKit up" }
 
 Write-Step "Starting Backend (FastAPI)..."
 Start-Window -Title "Backend" `
@@ -223,16 +207,9 @@ Write-Host "|          SkillMate is live on the internet                   |" -F
 Write-Host "+--------------------------------------------------------------+" -ForegroundColor Magenta
 Write-Host "  App (FE)  : $ngrokUrl" -ForegroundColor White
 Write-Host "  API (BE)  : $ngrokUrl/api" -ForegroundColor White
-Write-Host "  LiveKit   : $ngrokUrl/livekit" -ForegroundColor White
 Write-Host "+--------------------------------------------------------------+" -ForegroundColor Magenta
-Write-Host "  Local  FE=:$FE_PORT  BE=:$BE_PORT  LK=:$LK_PORT  Proxy=:$PROXY_PORT" -ForegroundColor DarkGray
+Write-Host "  Local  FE=:$FE_PORT  BE=:$BE_PORT  Proxy=:$PROXY_PORT" -ForegroundColor DarkGray
 Write-Host "+--------------------------------------------------------------+" -ForegroundColor Magenta
-Write-Host ""
-Write-Host "  WebRTC NOTE: LiveKit audio/video uses UDP/TCP ports separate" -ForegroundColor Yellow
-Write-Host "  from the WebSocket signalling tunnel. On the same LAN this" -ForegroundColor Yellow
-Write-Host "  works because the server LAN IP is reachable. For internet" -ForegroundColor Yellow
-Write-Host "  access from other networks you need a TURN server or" -ForegroundColor Yellow
-Write-Host "  LiveKit Cloud so media can traverse NAT/firewalls." -ForegroundColor Yellow
 Write-Host ""
 Write-Host "  Press Ctrl+C in THIS window to stop all services." -ForegroundColor Cyan
 

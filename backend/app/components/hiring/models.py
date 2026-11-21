@@ -22,7 +22,7 @@ class HiringFlow(Document):
 
 
 class HiringCandidate(Document):
-    """A selected candidate's progress through Level 1 and Level 2."""
+    """A selected candidate's progress through the Level 1 exam."""
     sourcing_jd_id: str
     profile_id: str
     user_id: str
@@ -32,10 +32,6 @@ class HiringCandidate(Document):
     level1_submission_id: str | None = None
     level1_percentage: float | None = None
     level1_report_sent: bool = False
-    level2_jd_interview_id: str | None = None
-    level2_interview_id: str | None = None
-    level2_due_date: datetime | None = None
-    promoted_manually: bool = False
     created_at: datetime = Field(default_factory=_now)
     updated_at: datetime = Field(default_factory=_now)
 
@@ -51,7 +47,7 @@ class HiringCandidate(Document):
 class HiringEvent(Document):
     """Human-readable activity feed for a JD's flow."""
     sourcing_jd_id: str
-    stage: str  # jd | sourcing | level1 | level2 | report
+    stage: str  # jd | sourcing | level1 | report
     level: str = "info"  # info | warn | error
     message: str
     ts: datetime = Field(default_factory=_now)

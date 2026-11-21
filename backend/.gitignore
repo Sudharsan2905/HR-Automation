@@ -41,7 +41,6 @@ livekit-server.exe
 *.pem
 
 # Generated artifacts
-audio_cache/
 reports/
 reports.zip
 *.zip
@@ -49,5 +48,3 @@ reports.zip
 # Test output
 test_tamil_output.pdf
 
-# Recorded interviews (ENABLE_RECORDING)
-recordings/

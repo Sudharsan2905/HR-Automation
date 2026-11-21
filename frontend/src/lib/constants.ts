@@ -2,11 +2,7 @@ export const ROUTES = {
   LOGIN: "/login",
   DASHBOARD: "/dashboard",
   HIRING: "/hiring",
-  EVALUATIONS: "/evaluations",
   EXAM: "/exam",
-  INTERVIEW_LOBBY: "/interview/lobby",
-  INTERVIEW_SESSION: "/interview/session",
-  INTERVIEW_COMPLETE: "/interview/complete",
 } as const;
 
 export const STATUS_COLORS: Record<string, string> = {
@@ -28,5 +24,5 @@ export const STATUS_COLORS: Record<string, string> = {
 
 export const ROLE_HOME: Record<string, string> = {
   super_admin: ROUTES.DASHBOARD,
-  candidate: ROUTES.INTERVIEW_LOBBY,
+  candidate: ROUTES.EXAM,
 };

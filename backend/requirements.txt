@@ -13,7 +13,3 @@ openai
 google-genai
 pymupdf
 python-docx
-jinja2
-reportlab
-livekit
-livekit-api

@@ -4,13 +4,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
-import { LayoutDashboard, Briefcase, BarChart3, ChevronLeft } from "lucide-react";
+import { LayoutDashboard, Briefcase, ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const links = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/hiring", label: "Hiring", icon: Briefcase },
-  { href: "/evaluations", label: "Evaluations", icon: BarChart3 },
 ];
 
 export function Sidebar() {

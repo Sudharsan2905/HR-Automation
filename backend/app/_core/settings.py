@@ -29,34 +29,13 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-2.0-flash"
 
-    # OpenAI TTS
-    OPENAI_TTS_MODEL: str = "tts-1"
-    OPENAI_TTS_VOICE: str = "nova"
-
-    # OpenAI STT
-    OPENAI_STT_MODEL: str = "gpt-4o-mini-transcribe"
-
-    # Reports
-    REPORT_STORAGE_PATH: str = "./reports"
-
-    # Audio cache (pre-generated TTS for static joke audio checks)
-    AUDIO_CACHE_PATH: str = "./audio_cache"
-
     # Super Admin Seed
     SUPER_ADMIN_EMAIL: str
     SUPER_ADMIN_PASSWORD: str
 
-    # LLM Token Limits
-    LLM_MAX_TOKENS_SINGLE_QUESTION: int = 2048
-    LLM_MAX_TOKENS_BULK_QUESTIONS: int = 16384
-    LLM_MAX_TOKENS_EVALUATION: int = 8192
-    LLM_MAX_TOKENS_JD_GENERATION: int = 8192
-    LLM_MAX_TOKENS_JD_REPORT: int = 8192
-
-    # JD Interview module
+    # Job description / profile text limits
     JD_MAX_CHARS: int = 24000
     RESUME_MAX_CHARS: int = 16000
-    JD_DEFAULT_QUESTIONS: int = 10
 
     # Naukri sourcing module
     SOURCING_BATCH_SIZE: int = 5
@@ -70,7 +49,7 @@ class Settings(BaseSettings):
     SOURCING_RUN_TIMEOUT_MINUTES: int = 20
 
     # Level 1 (AI-generated proctored exam)
-    LEVEL1_PASS_PERCENT: int = 75           # candidates must score ABOVE this to reach Level 2
+    LEVEL1_PASS_PERCENT: int = 75           # candidates must score ABOVE this to pass Level 1
     LEVEL1_QUESTION_MODEL: str = "gpt-4o"
     LEVEL1_ANALYSIS_MODEL: str = "gpt-4o-mini"
     LEVEL1_QUESTION_COUNTS: dict[str, int] = {"mcq_single": 10, "mcq_multi": 6, "essay": 4}
@@ -82,25 +61,15 @@ class Settings(BaseSettings):
     LEVEL1_MAX_MALPRACTICE: int = 3         # strikes before the exam is terminated
     LEVEL1_MAX_REACCESS: int = 3            # admin re-access grants per candidate
     LEVEL1_HOLD_DELAY_SECONDS: int = 60     # websocket silence before the session goes ON_HOLD
-    LEVEL2_DUE_DAYS: int = 3                # Level 2 due date = promotion time + this many days
     HIRING_AUTO_SELECT: bool = True         # shortlisted profiles are selected automatically
-
-    # LiveKit
-    LIVEKIT_URL: str = "ws://localhost:7880"
-    LIVEKIT_CLIENT_URL: str = ""  # URL sent to browser — defaults to LIVEKIT_URL if empty
-    LIVEKIT_API_KEY: str = ""
-    LIVEKIT_API_SECRET: str = ""
-    ENABLE_RECORDING: bool = False
-    RECORDING_STORAGE_PATH: str = "./recordings"
 
     # App
     APP_NAME: str = "SkillMate"
     APP_URL: str = "http://localhost:3000"
     CORS_ORIGINS: list[str] = ["http://localhost:3000"]
-    MAX_QUESTIONS_PER_SET: int = 100
-    MAX_QUESTIONS_PER_BULK: int = 25
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    # extra="ignore": an older .env may still hold keys for removed features (LiveKit, TTS, STT)
+    model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
 
 settings = Settings()

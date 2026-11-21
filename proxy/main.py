@@ -3,8 +3,6 @@ SkillMate reverse proxy — single-port entry point for ngrok.
 
 Routing table
   /api/{path}       →  http://localhost:8000  (FastAPI BE, /api prefix kept)
-  /livekit/{path}   →  http://localhost:7880  (/livekit stripped)
-  /livekit  [WS]    →  ws://localhost:7880    (LiveKit signalling)
   /*                →  http://localhost:3000  (Next.js FE)
   /*         [WS]   →  ws://localhost:3000    (Next.js HMR)
 """
@@ -24,8 +22,6 @@ logger = logging.getLogger("proxy")
 
 BACKEND     = "http://localhost:8000"
 FRONTEND    = "http://localhost:3000"
-LIVEKIT_H   = "http://localhost:7880"
-LIVEKIT_WS  = "ws://localhost:7880"
 FRONTEND_WS = "ws://localhost:3000"
 
 # Must not be forwarded across HTTP hops (RFC 7230 §6.1)
@@ -105,7 +101,7 @@ async def ws_proxy(client: WebSocket, upstream_uri: str) -> None:
         async with websockets.connect(
             upstream_uri,
             additional_headers=forward_headers,
-            max_size=2**24,      # 16 MB — large enough for LiveKit frames
+            max_size=2**24,      # 16 MB — large enough for proctoring frames
             ping_interval=None,  # let the application layer manage pings
         ) as upstream:
             done = asyncio.Event()
@@ -155,25 +151,6 @@ async def ws_proxy(client: WebSocket, upstream_uri: str) -> None:
 
 
 # ── Routes (most-specific first) ─────────────────────────────────────────────
-
-# LiveKit WebSocket — strip /livekit prefix
-@app.websocket("/livekit")
-async def lk_ws_root(ws: WebSocket):
-    qs = f"?{ws.url.query}" if ws.url.query else ""
-    await ws_proxy(ws, f"{LIVEKIT_WS}/{qs}")
-
-
-@app.websocket("/livekit/{path:path}")
-async def lk_ws(ws: WebSocket, path: str):
-    qs = f"?{ws.url.query}" if ws.url.query else ""
-    await ws_proxy(ws, f"{LIVEKIT_WS}/{path}{qs}")
-
-
-# LiveKit HTTP (Twirp RPC, health endpoint)
-@app.api_route("/livekit/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"])
-async def lk_http(request: Request, path: str):
-    return await http_proxy(request, LIVEKIT_H, strip_prefix="/livekit")
-
 
 # Backend — /api prefix is kept (BE routes already include it)
 @app.api_route("/api/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"])

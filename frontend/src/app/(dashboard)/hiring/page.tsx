@@ -18,7 +18,6 @@ const STAGE_LABEL: Record<string, string> = {
   jd: "JD analysis",
   sourcing: "Sourcing",
   level1: "Level 1",
-  level2: "Level 2",
   report: "Report",
   done: "Completed",
 };
@@ -73,7 +72,6 @@ export default function HiringPage() {
                   <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
                     <span>Candidates <b className="text-foreground">{f.candidate_count}</b></span>
                     <span>Level 1 done <b className="text-foreground">{f.stage_summary.level1_done}</b></span>
-                    <span>Level 2 done <b className="text-foreground">{f.stage_summary.level2_done}</b></span>
                   </div>
                   <p className="text-[11px] text-muted-foreground">{new Date(f.created_at).toLocaleString()}</p>
                 </CardContent>

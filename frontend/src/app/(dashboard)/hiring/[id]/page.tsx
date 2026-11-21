@@ -34,7 +34,7 @@ function isActive(f: HiringFlow) {
     f.jd.analysis_status === "generating" ||
     f.stages.some((s) => s.status === "running") ||
     f.level1_run?.status === "running" ||
-    f.candidates.some((c) => ["in_progress", "evaluating"].includes(c.level1.status) || c.level2.status === "in_progress")
+    f.candidates.some((c) => ["in_progress", "evaluating"].includes(c.level1.status))
   );
 }
 

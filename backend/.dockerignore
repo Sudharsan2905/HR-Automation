@@ -5,8 +5,6 @@ __pycache__
 .git
 .gitignore
 reports/
-recordings/
 tests/
 *.md
 docker-compose.yml
-livekit.yaml

@@ -1,4 +1,4 @@
-"""Hiring orchestration: Level 1 result gate (above 75%), Level 2 promotion, batching."""
+"""Hiring orchestration: Level 1 result gate (above 75%), result email, batching."""
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -45,24 +45,19 @@ def _no_real_email_or_report():
         yield
 
 
-@pytest.mark.parametrize("pct,expect_promote", [(76.0, True), (100.0, True), (75.0, False), (40.0, False)])
-async def test_pass_mark_is_strictly_above_75(pct, expect_promote):
+@pytest.mark.parametrize("pct,expect_pass", [(76.0, True), (100.0, True), (75.0, False), (40.0, False)])
+async def test_pass_mark_is_strictly_above_75(pct, expect_pass):
     hc, cand, sid = await _setup(pct)
-    promote = AsyncMock(return_value={"interview_id": "i1"})
-    with patch.object(service, "promote_to_level2", promote):
-        await service.on_level1_final(sid)
-    assert promote.called is expect_promote
+    await service.on_level1_final(sid)
     fresh = await HiringCandidate.get(hc.id)
-    assert fresh.level1_status == ("passed" if expect_promote else "failed")
+    assert fresh.level1_status == ("passed" if expect_pass else "failed")
     assert fresh.level1_percentage == pct
     assert fresh.level1_report_sent is True
 
 
 async def test_level1_key_expired_on_final_and_terminated_never_passes():
     hc, cand, sid = await _setup(95.0, status="terminated")
-    with patch.object(service, "promote_to_level2", AsyncMock()) as promote:
-        await service.on_level1_final(sid)
-    assert not promote.called
+    await service.on_level1_final(sid)
     assert (await HiringCandidate.get(hc.id)).level1_status == "terminated"
     from app.components.auth.models import User
 
@@ -70,31 +65,30 @@ async def test_level1_key_expired_on_final_and_terminated_never_passes():
     assert auth_service._is_expired(user.level1_key_expires_at)
 
 
-async def test_final_hook_emails_once_and_retries_failed_promotion():
+async def test_final_hook_emails_once_and_retries_unsent_email():
     hc, cand, sid = await _setup(90.0)
-    emails = []
+    attempts = []
 
     async def email(h, *args):
-        emails.append(1)
+        attempts.append(1)
+        if len(attempts) == 1:
+            return  # sending failed: level1_report_sent stays False
         h.level1_report_sent = True  # what the real sender records
         await h.save()
 
-    attempts = []
-
-    async def promote(h):
-        attempts.append(1)
-        if len(attempts) == 1:
-            raise RuntimeError("LLM down")
-        h = await HiringCandidate.get(h.id)
-        h.level2_interview_id = "i1"
-        await h.save()
-
-    with patch.object(service, "promote_to_level2", promote), patch.object(service, "_email_level1_result", email):
-        await service.on_level1_final(sid)   # promotion fails
+    with patch.object(service, "_email_level1_result", email):
+        await service.on_level1_final(sid)   # email fails
         await service.on_level1_final(sid)   # retried, succeeds
         await service.on_level1_final(sid)   # fully handled: no-op
     assert len(attempts) == 2
-    assert len(emails) == 1
+
+
+async def test_flow_view_ends_at_level1_report():
+    hc, cand, sid = await _setup(90.0)
+    await service.on_level1_final(sid)
+    view = await service._candidate_view(await HiringCandidate.get(hc.id), {})
+    assert "level2" not in view
+    assert view["final_report_sent"] is True
 
 
 async def test_sync_level1_starts_run_then_adds_late_candidates():

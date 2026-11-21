@@ -42,7 +42,7 @@ export function NewJdDialog({ open, onOpenChange }: { open: boolean; onOpenChang
         <DialogHeader>
           <DialogTitle>New hiring flow</DialogTitle>
           <DialogDescription>
-            SkillMate reads the JD, sources matching profiles from Naukri, then runs Level 1 and Level 2 automatically.
+            SkillMate reads the JD, sources matching profiles from Naukri, then runs the Level 1 exam automatically.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">

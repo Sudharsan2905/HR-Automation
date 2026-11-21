@@ -17,30 +17,6 @@ class UserStatus(str, Enum):
     REJECTED = "rejected"
 
 
-class DifficultyLevel(str, Enum):
-    EASY = "easy"
-    MEDIUM = "medium"
-    PRO = "pro"
-
-
-class InterviewStatus(str, Enum):
-    FINALIZED = "finalized"
-    COMPLETED = "completed"
-    PARTIALLY_COMPLETED = "partially_completed"
-
-
-class QuestionSetStatus(str, Enum):
-    DRAFT = "draft"
-    READY = "ready"
-
-
-class ContributionStatus(str, Enum):
-    PENDING = "pending"
-    ACTIVE = "active"
-    USED = "used"
-    REJECTED = "rejected"
-
-
 class GlobalResponse(BaseModel):
     """Standard API response wrapper."""
     success: bool

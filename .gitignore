@@ -25,12 +25,9 @@ tmp/
 # Local tunnels / binaries
 ngrok*.log
 ngrok.yml
-livekit-server.exe
 
 # Generated at runtime
 reports/
-recordings/
-audio_cache/
 
 # Editors / OS
 .vscode/

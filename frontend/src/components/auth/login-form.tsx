@@ -8,10 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { login, candidateLogin } from "@/lib/api/auth";
-import { getAudioCheck } from "@/lib/api/session";
 import { useAuthStore } from "@/stores/auth-store";
-import { useSessionStore } from "@/stores/session-store";
-import { candidateScope, decodeJwt } from "@/lib/utils";
+import { decodeJwt } from "@/lib/utils";
 import { ROLE_HOME } from "@/lib/constants";
 import { toast } from "sonner";
 import { Loader2, Eye, EyeOff } from "lucide-react";
@@ -59,17 +57,8 @@ export function LoginForm() {
       const res = await candidateLogin({ email, access_key: candidate.accessKey.trim() });
       const payload = decodeJwt(res.access_token);
       setAuth(res.access_token, res.role, payload?.email || email, payload?.full_name);
-      const scope = candidateScope(payload?.scope);
       toast.success("Login successful");
-      if (scope === "l2") {
-        // Pre-fetch the audio check so it is ready when the lobby opens
-        getAudioCheck()
-          .then((data) => useSessionStore.getState().setPreparedAudioCheck(data))
-          .catch(() => { /* the lobby fetches it on demand */ });
-        router.push("/interview/lobby");
-      } else {
-        router.push(next || "/exam");
-      }
+      router.push(next || "/exam");
     } catch (err: unknown) {
       const msg = (err as { message?: string })?.message || "";
       toast.error(msg.toLowerCase().includes("expired")
@@ -137,7 +126,7 @@ export function LoginForm() {
           <TabsContent value="candidate">
             <form onSubmit={handleCandidate} className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Use the email your invitation was sent to and the access key from it. Level 1 and Level 2 have different keys.
+                Use the email your invitation was sent to and the access key from it.
               </p>
               <div className="space-y-2">
                 <Label htmlFor="c-email">Email</Label>

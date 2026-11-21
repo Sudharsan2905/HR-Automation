@@ -31,7 +31,7 @@ async def login(req: LoginRequest) -> dict:
 
 
 def _candidate_token(user: User, scope: str) -> dict:
-    """Candidate JWT; ``scope`` ("l1" or "l2") restricts it to that level's endpoints."""
+    """Candidate JWT; ``scope`` ("l1") restricts it to the Level 1 exam endpoints."""
     token = create_access_token(
         {
             "sub": str(user.id),
@@ -52,8 +52,7 @@ def _is_expired(when: datetime | None) -> bool:
 
 
 async def login_candidate(req: CandidateLoginRequest) -> dict:
-    """Candidate login: the key decides the level. Level 1 keys are reusable until they
-    expire (time limit or exam submission); Level 2 keys are single use."""
+    """Candidate login: Level 1 keys are reusable until they expire (time limit or exam submission)."""
     user = await User.find_one(User.email == req.email, User.role == Role.CANDIDATE)
     if not user:
         raise HTTPException(401, "Invalid credentials")
@@ -62,14 +61,6 @@ async def login_candidate(req: CandidateLoginRequest) -> dict:
         if _is_expired(user.level1_key_expires_at):
             raise HTTPException(401, "Level 1 access key expired. Contact the admin for a new key.")
         return _candidate_token(user, "l1")
-
-    if user.access_key and secrets.compare_digest(user.access_key, req.access_key):
-        if user.access_key_used:
-            raise HTTPException(401, "Access key expired. Contact your interviewer for a new key.")
-        user.access_key_used = True
-        user.updated_at = datetime.now(timezone.utc)
-        await user.save()
-        return _candidate_token(user, "l2")
 
     raise HTTPException(401, "Invalid access key")
 
@@ -90,11 +81,6 @@ async def expire_level1_key(user: User) -> None:
     user.level1_key_expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
     user.updated_at = datetime.now(timezone.utc)
     await user.save()
-
-
-async def issue_level2_key(user: User) -> str:
-    """Create a fresh single-use Level 2 key."""
-    return (await _issue_new_access_key(user))["access_key"]
 
 
 async def link_candidate(req: CandidateLinkRequest, interviewer_id: str) -> dict:
@@ -123,31 +109,6 @@ async def link_candidate(req: CandidateLinkRequest, interviewer_id: str) -> dict
         "email": user.email,
         "full_name": user.full_name,
     }
-
-
-async def regenerate_access_key(candidate_id: str, interviewer_id: str) -> dict:
-    """Generate a new access key for a candidate by ID."""
-    user = await User.get(candidate_id)
-    if not user or user.role != Role.CANDIDATE:
-        raise HTTPException(404, "Candidate not found")
-    return await _issue_new_access_key(user)
-
-
-async def regenerate_access_key_by_email(email: str) -> dict:
-    """Generate a new access key for a candidate by email."""
-    user = await User.find_one(User.email == email, User.role == Role.CANDIDATE)
-    if not user:
-        raise HTTPException(404, "Candidate not found")
-    return await _issue_new_access_key(user)
-
-
-async def _issue_new_access_key(user: User) -> dict:
-    new_key = secrets.token_urlsafe(16)
-    user.access_key = new_key
-    user.access_key_used = False
-    user.updated_at = datetime.now(timezone.utc)
-    await user.save()
-    return {"message": "Access key regenerated", "access_key": new_key}
 
 
 async def delete_candidate(candidate_id: str, interviewer_id: str) -> dict:

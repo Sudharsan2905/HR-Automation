@@ -1,4 +1,4 @@
-"""Candidate login: separate Level 1 / Level 2 keys, expiry, scope gating."""
+"""Candidate login: Level 1 key reuse, expiry, scope gating."""
 
 from datetime import datetime, timedelta, timezone
 
@@ -38,19 +38,6 @@ async def test_level1_key_expires_by_time_and_by_submission():
     await service.expire_level1_key(user)
     with pytest.raises(HTTPException):
         await service.login_candidate(CandidateLoginRequest(email=user.email, access_key=key))
-
-
-async def test_level2_key_is_single_use_and_separate_from_level1():
-    user = await _candidate()
-    l1 = await service.issue_level1_key(user)
-    l2 = await service.issue_level2_key(user)
-    assert l1 != l2
-    tok = await service.login_candidate(CandidateLoginRequest(email=user.email, access_key=l2))
-    assert _scope(tok) == "l2"
-    with pytest.raises(HTTPException):
-        await service.login_candidate(CandidateLoginRequest(email=user.email, access_key=l2))
-    # Level 1 key still works independently
-    assert _scope(await service.login_candidate(CandidateLoginRequest(email=user.email, access_key=l1))) == "l1"
 
 
 async def test_wrong_key_rejected():

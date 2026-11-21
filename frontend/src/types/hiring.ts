@@ -1,4 +1,4 @@
-export type StageKey = "jd" | "sourcing" | "level1" | "level2" | "report";
+export type StageKey = "jd" | "sourcing" | "level1" | "report";
 export type StageStatus = "pending" | "running" | "done" | "failed" | "waiting";
 
 export interface FlowStage {
@@ -44,8 +44,6 @@ export interface Level1Run {
 export type Level1Status =
   | "not_started" | "invited" | "in_progress" | "evaluating" | "passed" | "failed" | "terminated";
 
-export type Level2Status = "not_started" | "scheduled" | "in_progress" | "completed" | "report_ready";
-
 export interface FlowCandidate {
   id: string;
   profile_id: string;
@@ -58,13 +56,6 @@ export interface FlowCandidate {
     submission_id: string | null;
     key_expires_at: string | null;
     assessment_id?: string | null;
-  };
-  level2: {
-    status: Level2Status;
-    interview_id: string | null;
-    jd_interview_id: string | null;
-    due_date: string | null;
-    recommendation: string | null;
   };
   final_report_sent: boolean;
 }
@@ -90,7 +81,7 @@ export interface HiringFlowSummary {
   title: string;
   created_at: string;
   candidate_count: number;
-  stage_summary: { level1_done: number; level2_done: number };
+  stage_summary: { level1_done: number };
   current_stage: string;
 }
 
