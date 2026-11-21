@@ -163,24 +163,22 @@
 
   const LADDER_GROUP_CAPS = [5, 3, 2];
 
-  // The searches to try, narrowest first. LinkedIn ANDs everything, so a long list of skills (or a city on top)
-  // often matches nobody; each later step is broader than the one before:
-  //   0  the plan's keywords without soft-skill groups, plus the JD's cities
-  //   1  the same without the cities
-  //   2+ only the first 5, then 3, then 2 skill groups (the plan lists the most central skills first)
-  // Steps that would repeat the one before are left out, so an index always means the same search for a plan.
+  // The searches to try, narrowest first. LinkedIn ANDs everything, so a long list of skills often matches nobody; each
+  // later step is broader than the one before:
+  //   0  the plan's keywords without soft-skill groups
+  //   1+ only the first 5, then 3, then 2 skill groups (the plan lists the most central skills first)
+  // Steps that would repeat the one before are left out, so an index always means the same search for a plan. The JD's
+  // cities and CTC play no part in a LinkedIn search: only experience is applied to LinkedIn candidates.
   function searchLevels(plan) {
     const keywords = searchKeywords(plan);
     if (!keywords) return [];
     let groups = splitTopLevel(keywords, 'AND');
     const technical = groups.filter((g) => !isSoftGroup(g));
     if (technical.length) groups = technical;                     // never strip a plan down to nothing
-    const cities = ((plan && plan.locations) || []).map((c) => String(c).trim().replace(/"/g, '')).filter(Boolean).slice(0, 5);
     const join = (gs) => gs.join(' AND ');
     const levels = [];
     const add = (q) => { if (q && !levels.includes(q)) levels.push(q); };
-    add(cities.length ? `(${join(groups)}) AND (${cities.map((c) => `"${c}"`).join(' OR ')})` : join(groups));
-    if (cities.length) add(join(groups));
+    add(join(groups));
     for (const cap of LADDER_GROUP_CAPS) if (groups.length > cap) add(join(groups.slice(0, cap)));
     return levels;
   }
@@ -264,9 +262,9 @@
       let line = String(raw || '').replace(/\s+/g, ' ').trim();
       if (!line) continue;
       const inline = line.match(/\s*[•·]\s*(1st|2nd|3rd\+?)\s*$/i);
-      if (inline) { degree = inline[1].toLowerCase(); line = line.slice(0, inline.index).trim(); }
+      if (inline) { if (!degree) degree = inline[1].toLowerCase(); line = line.slice(0, inline.index).trim(); }
       const d = line.match(DEGREE_RE);
-      if (d) { degree = d[1].toLowerCase(); continue; }
+      if (d) { if (!degree) degree = d[1].toLowerCase(); continue; }   // the first one is this person's; later ones belong to mutual connections
       if (!line || NOISE.some((re) => re.test(line))) continue;
       if (cleaned.length && cleaned[cleaned.length - 1] === line) continue;  // LinkedIn repeats the name for screen readers
       cleaned.push(line);
@@ -295,6 +293,82 @@
       name, degree, headline, location, title: role.title, company: role.company, skills,
       snippet: extra.join(' · ').slice(0, 600),
     };
+  }
+
+  // ── The JD's experience range ───────────────────────────────────────────────────────────────────────────────────
+
+  // LinkedIn's standard search has no "years of experience" filter, so the range is applied here, on what each
+  // candidate's profile shows. (Location and CTC are not applied to LinkedIn candidates.)
+
+  const MONTHS = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
+  const DATE = '(?:(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\\.?\\s+)?(\\d{4})';
+  const RANGE_RE = new RegExp(`${DATE}\\s*[-\u2013\u2014]\\s*(?:(Present)|${DATE})`, 'i');
+  const EMPLOYMENT_TYPE = /\b(full[- ]time|part[- ]time|contract|internship|self[- ]employed|freelance|apprenticeship|permanent)\b/i;
+
+  // The visible lines of a profile's Experience section -> the positions, and total years of experience. Total years is
+  // the length of the union of all the date ranges (so overlapping jobs are not double counted). Returns null when no
+  // date range can be read. `lowerBound` is true when LinkedIn shows only some of the positions ("Show all N
+  // experiences"): the real total is then at least this much, so it must not be used to call someone too junior.
+  function parseExperience(lines, now) {
+    const clean = [];
+    for (const raw of lines || []) {
+      const line = String(raw || '').replace(/\s+/g, ' ').trim();
+      if (!line || (clean.length && clean[clean.length - 1] === line)) continue;   // LinkedIn repeats lines for screen readers
+      clean.push(line);
+    }
+    const today = now instanceof Date ? now : new Date();
+    const nowIndex = today.getFullYear() * 12 + today.getMonth();
+    const spans = [];
+    const positions = [];
+    clean.forEach((line, i) => {
+      const m = line.match(RANGE_RE);
+      if (!m) return;
+      const sy = parseInt(m[2], 10);
+      const sm = m[1] ? MONTHS[m[1].toLowerCase()] : 0;
+      const isPresent = !!m[3];
+      const ey = isPresent ? today.getFullYear() : parseInt(m[5], 10);
+      const em = isPresent ? today.getMonth() : (m[4] ? MONTHS[m[4].toLowerCase()] : 11);
+      const start = sy * 12 + sm;
+      const end = Math.min(ey * 12 + em, nowIndex);
+      if (!(end >= start) || sy < 1960) return;
+      spans.push([start, end]);
+      const prev1 = clean[i - 1] || '';
+      const prev2 = clean[i - 2] || '';
+      const hasCompanyLine = prev1.includes(' \u00b7 ') || EMPLOYMENT_TYPE.test(prev1);
+      positions.push({
+        title: hasCompanyLine ? prev2 : prev1,
+        company: hasCompanyLine ? prev1.split(' \u00b7 ')[0].trim() : '',
+        duration: line.split(' \u00b7 ')[0].trim(),
+        is_current: isPresent,
+        starts_at: { year: sy, month: sm + 1 },
+        ends_at: isPresent ? {} : { year: ey, month: em + 1 },
+      });
+    });
+    if (!spans.length) return null;
+    spans.sort((a, b) => a[0] - b[0]);
+    let months = 0;
+    let [curStart, curEnd] = spans[0];
+    for (const [s, e] of spans.slice(1)) {
+      if (s <= curEnd + 1) curEnd = Math.max(curEnd, e);
+      else { months += curEnd - curStart + 1; [curStart, curEnd] = [s, e]; }
+    }
+    months += curEnd - curStart + 1;
+    return {
+      positions,
+      months,
+      years: Math.round((months / 12) * 10) / 10,
+      text: `${Math.floor(months / 12)} yrs ${months % 12} mos`,
+      lowerBound: clean.some((l) => /^show all \d+ experiences?$/i.test(l)),
+    };
+  }
+
+  // Does this person's experience fit the JD's range? Unknown experience fits (nothing to judge by). Someone clearly over
+  // the maximum is out whatever the profile hides; under the minimum only counts when the whole history was visible.
+  function experienceFits(min, max, exp) {
+    if (!exp || typeof exp.years !== 'number') return true;
+    const tooSenior = max != null && exp.years > max;
+    const tooJunior = !exp.lowerBound && min != null && exp.years < min;
+    return !(tooSenior || tooJunior);
   }
 
   // ── Reading the contact-info dialog ───────────────────────────────────────────
@@ -333,12 +407,27 @@
     return out;
   }
 
+  // Has the dialog got past its title and promo to its contact rows? Every dialog, even one whose owner shares nothing,
+  // lists at least the profile link or "Connected since"; before they load only the title and a promo show.
+  function contactRowsLoaded(lines) {
+    return (lines || []).some((l) => /^(email|phone|websites?|address|birthday|connected since|ims?|twitter|wechat)$/i.test(String(l).trim())
+      || /linkedin\.com\/in\//i.test(String(l)) || /(?:'|\u2019)s profile$/i.test(String(l).trim()));
+  }
+
+  // A short, safe description of text for the run record: emails and long numbers are masked.
+  function redact(text, max) {
+    return String(text || '').replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '<email>').replace(/\d{6,}/g, '<num>')
+      .replace(/\s+/g, ' ').trim().slice(0, max || 140);
+  }
+
   // lines: the dialog's visible text lines; mailtos: the dialog's mailto: link targets.
   function parseContactOverlay(lines, mailtos) {
     const clean = (lines || []).map((l) => String(l || '').replace(/\s+/g, ' ').trim()).filter(Boolean);
     let email = '';
     for (const l of sectionAfter(clean, 'email')) { email = validEmail(l); if (email) break; }
     if (!email) for (const h of mailtos || []) { email = validEmail(String(h).replace(/^mailto:/i, '')); if (email) break; }
+    // Last resort: the dialog is only ever about one person, so any valid address in it is theirs.
+    if (!email) for (const l of clean) { email = validEmail(l); if (email) break; }
     let phone = '';
     for (const l of sectionAfter(clean, 'phone')) { phone = validPhone(l); if (phone) break; }
     return { email, phone };
@@ -348,6 +437,7 @@
 
   const ERROR_TEXT = {
     not_logged_in: 'Log in to LinkedIn to continue sourcing.',
+    contacts_unreadable: 'Stopped: could not read LinkedIn\u2019s contact dialogs (LinkedIn\u2019s page may have changed). Nothing was added; details are saved on the run.',
     captcha: 'Stopped: LinkedIn is asking for a security check — complete it in the LinkedIn tab',
     restricted: 'Stopped: LinkedIn limited this account (search limit or restriction). Try again later.',
     no_results: 'Stopped: LinkedIn found no people for this JD, even after broadening the search',
@@ -390,8 +480,8 @@
     PAGE_SOURCE, EXT_SOURCE, REQUEST_TYPES,
     isAllowedOrigin, isPageRequest, isAllowedApiBase, apiUrl,
     isLinkedinLoginUrl, isLinkedinCheckpointUrl, classifyBlock, isNoResultsText,
-    canShareEmail, searchKeywords, splitTopLevel, isSoftGroup, searchLevels, buildSearchQuery, buildSearchUrl, normalizeProfileUrl, contactInfoUrl,
-    parseResultLines, splitRoleCompany, validEmail, validPhone, parseContactOverlay,
+    parseExperience, experienceFits, canShareEmail, searchKeywords, splitTopLevel, isSoftGroup, searchLevels, buildSearchQuery, buildSearchUrl, normalizeProfileUrl, contactInfoUrl,
+    contactRowsLoaded, redact, parseResultLines, splitRoleCompany, validEmail, validPhone, parseContactOverlay,
     stageLabel, pickLinkedinTab, hasVisibleLoginForm,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

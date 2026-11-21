@@ -25,6 +25,7 @@ def compute_score(
     experience_years: float | None,
     ctc_lacs: float | None,
     req: SourcingRequirements,
+    experience_is_floor: bool = False,
 ) -> tuple[int, dict]:
     """Return (score 0..100, breakdown). Rejections score 0 with a reason."""
     # Line the screener's findings up with the requirement list by skill name (or variant),
@@ -43,7 +44,10 @@ def compute_score(
             return _rejected(f"missing mandatory: {f.skill}")
 
     if experience_years is not None:
-        too_junior = req.experience_min_years is not None and experience_years < req.experience_min_years
+        # LinkedIn shows only some positions on a long profile: the real total is at least this, so it can prove someone
+        # too senior but not too junior.
+        too_junior = (not experience_is_floor and req.experience_min_years is not None
+                      and experience_years < req.experience_min_years)
         too_senior = req.experience_max_years is not None and experience_years > req.experience_max_years
         if too_junior or too_senior:
             return _rejected("experience out of range")

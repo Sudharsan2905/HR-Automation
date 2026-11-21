@@ -3,6 +3,7 @@
 import asyncio
 import json
 import re
+from collections.abc import AsyncIterator
 
 from app._core.settings import settings
 from app.components.sourcing.models import SkillSpec, SourcedProfile, SourcingRequirements, SourcingSearchPlan
@@ -108,15 +109,19 @@ async def build_search_plan(req: SourcingRequirements) -> SourcingSearchPlan:
     )
 
 
-async def screen_profiles(req: SourcingRequirements, profiles: list[SourcedProfile]) -> dict[str, LLMScreenedProfile]:
-    """Agent 3 — Candidate Screener. Returns findings keyed by source_link; unknown links are dropped.
+async def screen_profiles_iter(
+    req: SourcingRequirements, profiles: list[SourcedProfile],
+) -> AsyncIterator[tuple[list[SourcedProfile], dict[str, LLMScreenedProfile]]]:
+    """Agent 3 — Candidate Screener, one chunk at a time: yields (chunk, findings keyed by source_link) as soon as
+    that chunk's call finishes, so the first people are scored while the rest are still being screened.
 
-    Profiles go in chunks of SOURCING_SCREEN_CHUNK, up to SOURCING_SCREEN_CONCURRENCY calls at once."""
+    Profiles go in chunks of SOURCING_SCREEN_CHUNK, up to SOURCING_SCREEN_CONCURRENCY calls at once. A chunk whose call
+    failed is yielded with no findings (its people come back unscreened); unknown links are dropped."""
     chunk = max(1, settings.SOURCING_SCREEN_CHUNK)
     gate = asyncio.Semaphore(max(1, settings.SOURCING_SCREEN_CONCURRENCY))
     req_json = req.model_dump_json(indent=2)
 
-    async def one(n: int, batch: list[SourcedProfile]) -> list[LLMScreenedProfile]:
+    async def one(n: int, batch: list[SourcedProfile]) -> tuple[list[SourcedProfile], dict[str, LLMScreenedProfile]]:
         wanted = {p.source_link for p in batch}
         payload = [{k: getattr(p, k) for k in _SCREEN_FIELDS} for p in batch]
         prompt = SCREENER_PROMPT.format(requirements_json=req_json, profiles_json=json.dumps(payload, default=str))
@@ -125,12 +130,26 @@ async def screen_profiles(req: SourcingRequirements, profiles: list[SourcedProfi
                 result: LLMScreenBatch = await _call(prompt, LLMScreenBatch)
             except Exception as e:  # this chunk's profiles come back unscreened; the rest still count
                 log.warning("Screening chunk %d failed: %s", n, e)
-                return []
-        return [s for s in result.profiles if s.source_link in wanted]
+                return batch, {}
+        found: dict[str, LLMScreenedProfile] = {}
+        for s in result.profiles:
+            if s.source_link in wanted:
+                found.setdefault(s.source_link, s)
+        return batch, found
 
-    batches = [profiles[i:i + chunk] for i in range(0, len(profiles), chunk)]
+    tasks = [asyncio.ensure_future(one(n + 1, profiles[i:i + chunk])) for n, i in enumerate(range(0, len(profiles), chunk))]
+    try:
+        for done in asyncio.as_completed(tasks):
+            yield await done
+    finally:
+        for t in tasks:
+            t.cancel()  # the consumer stopped early: do not leave calls running
+
+
+async def screen_profiles(req: SourcingRequirements, profiles: list[SourcedProfile]) -> dict[str, LLMScreenedProfile]:
+    """Agent 3 — Candidate Screener. Returns findings keyed by source_link once every chunk is done."""
     out: dict[str, LLMScreenedProfile] = {}
-    for found in await asyncio.gather(*(one(n + 1, b) for n, b in enumerate(batches))):
-        for s in found:
-            out.setdefault(s.source_link, s)
+    async for _batch, found in screen_profiles_iter(req, profiles):
+        for link, s in found.items():
+            out.setdefault(link, s)
     return out

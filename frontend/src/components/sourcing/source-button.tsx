@@ -27,6 +27,7 @@ const NAUKRI_ERRORS: Record<string, string> = {
 
 const LINKEDIN_ERRORS: Record<string, string> = {
   captcha: "LinkedIn is asking for a security check. Complete it in the LinkedIn tab, then try again.",
+  contacts_unreadable: "SkillMate could not read LinkedIn's contact dialogs, so nothing was added (this is not the same as nobody sharing an email). LinkedIn's page may have changed. What was read is saved on the run.",
   restricted: "LinkedIn limited this account (search limit or restriction). Try again later.",
   skillmate_auth: "Your SkillMate session expired. Refresh this page and try again.",
   search_failed: "LinkedIn didn't show search results. Check the LinkedIn tab and try again.",
@@ -173,7 +174,7 @@ export function SourceButton({ jd, ext, li, onChanged }: { jd: SourcingJdDetail;
             toast.success(`Added ${current.profiles_shortlisted} new match${current.profiles_shortlisted > 1 ? "es" : ""}`);
           } else if (current.source === "linkedin" && current.profiles_scanned > 0) {
             // LinkedIn candidates are taken only with an email: say why a run that read people added none.
-            toast.info(`No new matches: ${current.profiles_scanned} LinkedIn connection${current.profiles_scanned > 1 ? "s were" : " was"} checked, ${current.profiles_received} shared an email and none passed the screening.`);
+            toast.info(`No new matches: ${current.profiles_scanned} LinkedIn connection${current.profiles_scanned > 1 ? "s were" : " was"} checked; ${current.profiles_received} had a readable email and fit the experience range, and none passed the screening.`);
           } else {
             toast.success("No new matches this time");
           }

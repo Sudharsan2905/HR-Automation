@@ -21,6 +21,11 @@
     // an email only with 1st-degree connections, so the search is limited to them and 2nd/3rd-degree people are
     // skipped without opening their profile. Set false to send every card instead (emails are then read at Select).
     EMAIL_ONLY: true,
+    // Apply the JD's experience range to LinkedIn candidates (with EMAIL_ONLY, which is when each profile is opened). LinkedIn
+    // has no experience filter, so the Experience section of each profile is read and added up; someone whose total is
+    // outside the JD's range is left out, and someone whose experience cannot be read is kept. The JD's location and CTC
+    // are NOT applied to LinkedIn candidates.
+    FILTER_BY_EXPERIENCE: true,
     // Open the working tab in the foreground. Leave false normally; set true if LinkedIn shows empty cards because
     // it doesn't finish rendering in a background tab (the tab then takes focus for each run and contact read).
     WORK_TAB_ACTIVE: false,

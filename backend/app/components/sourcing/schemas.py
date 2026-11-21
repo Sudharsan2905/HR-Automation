@@ -84,6 +84,11 @@ class ScrapedProfileIn(BaseModel):
     phone: str = ""
 
 
+class ProfileStreamIn(BaseModel):
+    """People of the page being read, sent as soon as the extension has them (usually one at a time)."""
+    profiles: list[ScrapedProfileIn] = Field(default_factory=list, max_length=50)
+
+
 class ProfilesIn(BaseModel):
     profiles: list[ScrapedProfileIn] = Field(default_factory=list, max_length=400)
     ended: bool = False                 # the source had no further result pages
@@ -93,6 +98,9 @@ class ProfilesIn(BaseModel):
     # LinkedIn: how many people the page showed. Only those with an email are sent in `profiles`; this keeps the
     # page counted (and the run moving on) when nobody on it had one.
     scanned: int | None = Field(None, ge=0, le=1000)
+    # LinkedIn: a one-line record of what was read on this page (cards, connection degrees, dialogs read, emails found),
+    # kept on the run so an empty result can be explained afterwards. Never contains an email or a phone number.
+    debug: str = Field("", max_length=1000)
 
 
 class StartRunIn(BaseModel):

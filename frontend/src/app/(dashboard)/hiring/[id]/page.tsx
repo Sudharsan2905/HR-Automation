@@ -77,7 +77,8 @@ export default function HiringFlowPage() {
   const working = jd?.analysis_status === "generating" || !!jd?.active_run;
   useEffect(() => {
     if (!working) return;
-    const t = setInterval(load, 3000);
+    // While a run reads, people arrive one by one: refresh often enough that they show up as they are found.
+    const t = setInterval(load, 2000);
     return () => clearInterval(t);
   }, [working, load]);
 
@@ -247,7 +248,7 @@ export default function HiringFlowPage() {
             )}
             <Card>
               <CardContent className="p-4">
-                <ProfilesTable profiles={profiles} counts={jd.counts} runs={jd.runs} ext={ext} li={li} onChanged={() => { load(); reloadFlow(); }} />
+                <ProfilesTable profiles={profiles} counts={jd.counts} runs={jd.runs} ext={ext} li={li} liveRunId={jd.active_run?.id ?? null} onChanged={() => { load(); reloadFlow(); }} />
               </CardContent>
             </Card>
           </TabsContent>

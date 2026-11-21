@@ -56,6 +56,9 @@ apiClient.interceptors.response.use(
 export const isExamUnauthorized = (e: unknown) =>
   !!e && typeof e === "object" && (e as { unauthorized?: boolean }).unauthorized === true;
 
+export const getMyExamAssessment = () =>
+  apiClient.get<unknown, { share_link: string | null }>(`${BASE}/my-assessment`);
+
 export const getExamAssessment = (shareLink: string) =>
   apiClient.get<unknown, ExamAssessment>(`${BASE}/assessment/${shareLink}`);
 

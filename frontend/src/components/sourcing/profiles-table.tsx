@@ -51,13 +51,15 @@ function ScoreCell({ p }: { p: SourcedProfile }) {
   );
 }
 
-export function ProfilesTable({ profiles, counts, runs, ext, li, onChanged }: {
+export function ProfilesTable({ profiles, counts, runs, ext, li, onChanged, liveRunId = null }: {
   profiles: SourcedProfile[];
   counts: StatusCounts;
   runs: SourcingRun[];
   ext: Ext;
   li: LiExt;
   onChanged: () => void;
+  /** The run that is reading right now: its people show as soon as they are found, marked "Screening…". */
+  liveRunId?: string | null;
 }) {
   const [tab, setTab] = useState<Tab>("shortlisted");
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -68,7 +70,13 @@ export function ProfilesTable({ profiles, counts, runs, ext, li, onChanged }: {
   const [loginFor, setLoginFor] = useState<SourcedProfile | null>(null);
 
   const runNo = (id: string | null) => runs.find((r) => r.id === id)?.run_no;
-  const rows = tab === "all" ? profiles : profiles.filter((p) => p.status === tab);
+  // A person the running search has found but SkillMate has not scored yet. They show under "Shortlisted" at once,
+  // instead of only appearing there once they pass; if they don't pass they move to "All".
+  const isScreening = (p: SourcedProfile) =>
+    !!liveRunId && p.run_id === liveRunId && p.status === "pool" && p.score == null;
+  const rows = tab === "all" ? profiles
+    : tab === "shortlisted" ? profiles.filter((p) => p.status === "shortlisted" || isScreening(p))
+    : profiles.filter((p) => p.status === tab);
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
 
   const reportCandidate = (res: { candidate_error: string | null; profile: SourcedProfile }) => {
@@ -185,7 +193,7 @@ export function ProfilesTable({ profiles, counts, runs, ext, li, onChanged }: {
 
   // Select / Hold / Reject — shared by the table rows and the profile panel.
   const actions = (p: SourcedProfile) => {
-    if (p.status === "below_threshold") return null;  // under the score threshold: view only
+    if (p.status === "below_threshold" || isScreening(p)) return null;  // under the threshold, or not scored yet: view only
     if (busyId === p.id) return <Loader2 className="h-4 w-4 animate-spin" />;
     return (
       <>
@@ -257,8 +265,9 @@ export function ProfilesTable({ profiles, counts, runs, ext, li, onChanged }: {
                 <TableCell>{p.experience_years != null ? `${p.experience_years} y` : "—"}</TableCell>
                 <TableCell>{p.current_ctc_lacs != null ? `${p.current_ctc_lacs} L` : "—"}</TableCell>
                 <TableCell className="text-sm">{p.location || "—"}</TableCell>
-                <TableCell><ScoreCell p={p} /></TableCell>
+                <TableCell>{isScreening(p) ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : <ScoreCell p={p} />}</TableCell>
                 <TableCell className="text-xs">
+                  {isScreening(p) && <p className="text-muted-foreground">Screening…</p>}
                   {p.match_reasons.map((r, i) => <p key={i}>{r}</p>)}
                   {p.related_notes.map((r, i) => <p key={`rel-${i}`} className="text-amber-600">{r}</p>)}
                   {p.status === "selected" && p.candidate_user_id && (

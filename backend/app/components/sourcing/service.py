@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 
 from beanie.operators import In, NE
+from bson import ObjectId
 from fastapi import BackgroundTasks, HTTPException, UploadFile
 
 from app._core.settings import settings
@@ -363,32 +364,41 @@ async def delete_jd(jd_id: str, user: User) -> dict:
 
 # ── Screening ────────────────────────────────────────────────────────────────
 
-async def _screen_and_score(jd: SourcingJd, profiles: list[SourcedProfile]) -> None:
-    """Screen with Agent 3, score in code, and move each profile to pool / below_threshold."""
+async def _screen_and_score(jd: SourcingJd, profiles: list[SourcedProfile], live_run_id: str | None = None) -> None:
+    """Screen with Agent 3, score in code, and move each profile to pool / below_threshold.
+
+    Each chunk is saved as soon as its screening call returns, so the first matches show in the table while the rest
+    are still being screened. With `live_run_id`, a match is also shortlisted for that run right away while the run
+    still has room (it looks for SOURCING_BATCH_SIZE), instead of waiting for the whole batch."""
     if not profiles:
         return
-    results = await agents.screen_profiles(jd.requirements, profiles)
-    for p in profiles:
-        s = results.get(p.source_link)
-        if s is None:
-            p.status = "below_threshold"
-            p.score = 0
-            p.score_breakdown = {"rejected_reason": "not screened", "total": 0}
-            p.match_reasons = ["Could not be screened"]
-            p.related_notes = []
-            p.screening = None
-        else:
-            s = apply_source_rules(s, p.source)
-            score, breakdown = compute_score(s, p.experience_years, p.current_ctc_lacs, jd.requirements)
-            p.screening = s.model_dump()
-            p.score = score
-            p.score_breakdown = breakdown
-            p.match_reasons = s.match_reasons
-            p.related_notes = related_notes(s)
-            p.status = "pool" if score >= settings.SOURCING_MIN_SCORE else "below_threshold"
-        p.screened_with_version = jd.requirements_version
-        p.updated_at = _now()
-        await p.save()
+    async for batch, results in agents.screen_profiles_iter(jd.requirements, profiles):
+        for p in batch:
+            s = results.get(p.source_link)
+            if s is None:
+                p.status = "below_threshold"
+                p.score = 0
+                p.score_breakdown = {"rejected_reason": "not screened", "total": 0}
+                p.match_reasons = ["Could not be screened"]
+                p.related_notes = []
+                p.screening = None
+            else:
+                s = apply_source_rules(s, p.source)
+                score, breakdown = compute_score(s, p.experience_years, p.current_ctc_lacs, jd.requirements,
+                                                 experience_is_floor=bool((p.raw or {}).get("experience_is_lower_bound")))
+                p.screening = s.model_dump()
+                p.score = score
+                p.score_breakdown = breakdown
+                p.match_reasons = s.match_reasons
+                p.related_notes = related_notes(s)
+                p.status = "pool" if score >= settings.SOURCING_MIN_SCORE else "below_threshold"
+            if live_run_id and p.status == "pool" and await _claim_shortlist_slot(live_run_id):
+                p.status = "shortlisted"
+                p.shortlisted_in_run_id = live_run_id
+                p.status_history.append(StatusEvent(status="shortlisted", by="system"))
+            p.screened_with_version = jd.requirements_version
+            p.updated_at = _now()
+            await p.save()
 
 
 async def rescreen_pool(jd_id: str) -> None:
@@ -415,6 +425,40 @@ async def rescreen_pool(jd_id: str) -> None:
 async def _touch(run: SourcingRun) -> None:
     run.updated_at = _now()
     await run.save()
+
+
+async def _claim_shortlist_slot(run_id: str) -> bool:
+    """Atomically take one of the run's shortlist places; False once SOURCING_BATCH_SIZE are taken, the run is past
+    its "hunting" phase, or it is over. Atomic because several screening calls can finish at the same moment."""
+    taken = await SourcingRun.get_motor_collection().find_one_and_update(
+        {"_id": ObjectId(run_id), "phase": "hunting", "status": {"$in": list(ACTIVE_RUN_STATUSES)},
+         "profiles_shortlisted": {"$lt": settings.SOURCING_BATCH_SIZE}},
+        {"$inc": {"profiles_shortlisted": 1}, "$set": {"updated_at": _now()}},
+    )
+    return taken is not None
+
+
+# Screening of people streamed in while a page is still being read (see receive_stream) runs in the background.
+# The page's own post and process_page wait for these first, so nobody is screened twice and no counter is overwritten.
+_inflight: dict[str, set[asyncio.Task]] = {}
+
+
+def _track(run_id: str, task: asyncio.Task) -> None:
+    tasks = _inflight.setdefault(run_id, set())
+    tasks.add(task)
+
+    def _done(t: asyncio.Task) -> None:
+        tasks.discard(t)
+        if not tasks and _inflight.get(run_id) is tasks:
+            _inflight.pop(run_id, None)
+
+    task.add_done_callback(_done)
+
+
+async def _wait_inflight(run_id: str) -> None:
+    pending = list(_inflight.get(run_id, ()))
+    if pending:
+        await asyncio.gather(*pending, return_exceptions=True)
 
 
 async def _expire_stale_runs(jd_id: str) -> None:
@@ -531,7 +575,7 @@ def _current_role(experiences: list[dict]) -> tuple[str, str]:
 async def receive_profiles(run_id: str, profiles: list[ScrapedProfileIn], user: User,
                            background_tasks: BackgroundTasks, *, ended: bool = False,
                            source_url: str = "", search_level: int | None = None,
-                           scanned: int | None = None) -> dict:
+                           scanned: int | None = None, debug: str = "") -> dict:
     """One results page from an extension. Screening runs in the background.
 
     A person is stored once per JD: by profile link and, when the page already shows an email, by email too,
@@ -539,6 +583,7 @@ async def receive_profiles(run_id: str, profiles: list[ScrapedProfileIn], user: 
 
     A LinkedIn candidate is only taken with an email: the extension sends just the people whose contact dialog gave
     one, and anyone without is refused here too, whatever sent them."""
+    await _wait_inflight(run_id)  # screening of people streamed in earlier on this page moves the run's counters
     run, jd = await _get_owned_run(run_id, user, write=True)
     if run.mode != "scrape" or run.status not in ("pending", "scraping") or run.next_action != "next_page":
         raise HTTPException(409, "This run is not waiting for a page")
@@ -551,6 +596,8 @@ async def receive_profiles(run_id: str, profiles: list[ScrapedProfileIn], user: 
     run.results_ended = ended
     if source_url:
         run.source_url = source_url[:500]
+    if debug:  # one line per page; the newest are kept when the run has read many
+        run.debug = (f"{run.debug} | {debug}" if run.debug else debug)[-1000:]
     await _touch(run)
     if run.source == "linkedin" and search_level is not None and jd.linkedin_search_level != search_level:
         # The extension had to broaden the search to find anyone: later runs keep paging through that same search.
@@ -558,13 +605,25 @@ async def receive_profiles(run_id: str, profiles: list[ScrapedProfileIn], user: 
         jd.updated_at = _now()
         await jd.save()
 
+    inserted, duplicates, no_email = await _store_profiles(jd, run, profiles)
+    run.profiles_new += len(inserted)
+    await _touch(run)
+    background_tasks.add_task(process_page, run_id)
+    return {"accepted": len(inserted), "duplicates": duplicates, "no_email": no_email}
+
+
+async def _store_profiles(jd: SourcingJd, run: SourcingRun, profiles: list[ScrapedProfileIn],
+                          ) -> tuple[list[SourcedProfile], int, int]:
+    """Insert the people of one batch that are new to this JD; returns (inserted, duplicates, without_email).
+
+    A person is new when neither their link nor (if known) their email is stored yet."""
     jd_id = str(jd.id)
     cfg = _source_cfg(run.source)
     known = await SourcedProfile.find(SourcedProfile.sourcing_jd_id == jd_id).to_list()
     existing = {p.source_link for p in known}
     existing_emails = {p.email.lower() for p in known if p.email}
     require_email = run.source == "linkedin"
-    inserted = 0
+    inserted: list[SourcedProfile] = []
     duplicates = 0
     no_email = 0
     for sp in profiles:
@@ -582,8 +641,8 @@ async def receive_profiles(run_id: str, profiles: list[ScrapedProfileIn], user: 
         if email:
             existing_emails.add(email)
         company, title = _current_role(sp.experiences)
-        await SourcedProfile(
-            sourcing_jd_id=jd_id, run_id=run_id, source=cfg.label, source_link=link,
+        profile = SourcedProfile(
+            sourcing_jd_id=jd_id, run_id=str(run.id), source=cfg.label, source_link=link,
             name=sp.name.strip() or "Unknown", snippet=sp.snippet,
             headline=sp.headline, location=sp.location, current_company=company, current_title=title,
             skills=sp.skills, experiences=sp.experiences, education=sp.education,
@@ -591,13 +650,41 @@ async def receive_profiles(run_id: str, profiles: list[ScrapedProfileIn], user: 
             current_ctc=sp.current_ctc, current_ctc_lacs=sp.current_ctc_lacs,
             email=email, phone=(sp.phone or "").strip(),
             raw=sp.model_dump(), status="pool",
-        ).insert()
-        inserted += 1
+        )
+        await profile.insert()
+        inserted.append(profile)
+    return inserted, duplicates, no_email
 
-    run.profiles_new += inserted
-    await _touch(run)
-    background_tasks.add_task(process_page, run_id)
-    return {"accepted": inserted, "duplicates": duplicates, "no_email": no_email}
+
+async def receive_stream(run_id: str, profiles: list[ScrapedProfileIn], user: User) -> dict:
+    """People of the page being read, sent one by one as the extension finds them (LinkedIn: the moment a person's
+    email is read). They are stored and screened at once, so they appear in the table while the page is still being
+    read; when the page ends, its own post only has to close the page (receive_profiles with no people left to send)."""
+    run, jd = await _get_owned_run(run_id, user, write=True)
+    if run.mode != "scrape" or run.status not in ("pending", "scraping") or run.next_action != "next_page":
+        raise HTTPException(409, "This run is not reading a page")
+    inserted, duplicates, no_email = await _store_profiles(jd, run, profiles)
+    # Atomic: screening tasks of earlier people of this page move this run's counters at the same time.
+    await SourcingRun.get_motor_collection().update_one(
+        {"_id": run.id},
+        {"$inc": {"profiles_received": len(profiles), "profiles_new": len(inserted)}, "$set": {"updated_at": _now()}},
+    )
+    if inserted:
+        _track(run_id, asyncio.create_task(_screen_streamed(run_id, [str(p.id) for p in inserted])))
+    return {"accepted": len(inserted), "duplicates": duplicates, "no_email": no_email}
+
+
+async def _screen_streamed(run_id: str, profile_ids: list[str]) -> None:
+    """Background: screen people streamed in by receive_stream and shortlist matches live."""
+    try:
+        run = await SourcingRun.get(run_id)
+        jd = await SourcingJd.get(run.sourcing_jd_id) if run else None
+        if not jd:
+            return
+        found = [await SourcedProfile.get(pid) for pid in profile_ids]
+        await _screen_and_score(jd, [p for p in found if p and p.status == "pool" and p.score is None], live_run_id=run_id)
+    except Exception as e:  # they stay unscored: process_page screens whoever is left when the page ends
+        log.error("Streamed screening failed for run %s: %s", run_id, e, exc_info=True)
 
 
 async def _finish(run: SourcingRun, status: str, error: str | None = None) -> None:
@@ -624,6 +711,7 @@ def _notify_hiring_run_done(run_id: str) -> None:
 
 async def process_page(run_id: str) -> None:
     """Background: screen the page just received, shortlist, then ask for another page or finish."""
+    await _wait_inflight(run_id)  # people streamed in while the page was read are screened already
     run = await SourcingRun.get(run_id)
     if not run or run.status != "screening":
         return
@@ -634,7 +722,11 @@ async def process_page(run_id: str) -> None:
     cfg = _source_cfg(run.source)
     try:
         new = await _unscored_pool(jd_id, SourcedProfile.run_id == run_id).to_list()
-        await _screen_and_score(jd, new)
+        await _screen_and_score(jd, new, live_run_id=run_id)
+        # Live shortlisting moved the counters in the database: carry on from those, not from the copy loaded above.
+        run = await SourcingRun.get(run_id) or run
+        if run.status != "screening":
+            return  # cancelled or timed out meanwhile
 
         if run.phase == "hunting":
             run.profiles_shortlisted += await _shortlist_from_pool(
@@ -688,13 +780,15 @@ async def process_pool_run(run_id: str) -> None:
             todo = await _unscored_pool(jd_id).sort(+SourcedProfile.id).limit(group).to_list()
             if not todo:
                 break
-            await _screen_and_score(jd, todo)
-            run.profiles_shortlisted += await _shortlist_from_pool(
-                jd_id, run_id, settings.SOURCING_BATCH_SIZE - run.profiles_shortlisted)
-            run.profiles_received += len(todo)
+            await _screen_and_score(jd, todo, live_run_id=run_id)
             current = await SourcingRun.get(run_id)
             if current and current.status != "screening":
                 return  # cancelled or timed out meanwhile
+            if current:
+                run.profiles_shortlisted = current.profiles_shortlisted  # matches shortlisted live while screening
+            run.profiles_shortlisted += await _shortlist_from_pool(
+                jd_id, run_id, settings.SOURCING_BATCH_SIZE - run.profiles_shortlisted)
+            run.profiles_received += len(todo)
             await _touch(run)
         await _finish(run, "done")
     except Exception as e:

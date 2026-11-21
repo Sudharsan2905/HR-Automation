@@ -11,7 +11,7 @@ const read = (f) => fs.readFileSync(path.join(EXT, f), 'utf8');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function makeEnv(scn) {
-  const log = { posts: [], fails: [], contacts: [], events: [], navigations: [], closed: [], activated: [] };
+  const log = { posts: [], streams: [], fails: [], contacts: [], events: [], navigations: [], closed: [], activated: [], extractMsgs: [] };
   const store = new Map();
   const tabs = new Map();
   let nextTab = 100;
@@ -35,7 +35,7 @@ function makeEnv(scn) {
       async update(id, props) {
         const t = tabs.get(id);
         if (!t) throw new Error('no tab');
-        if (props.active) log.activated.push(id);
+        if (props.active) { log.activated.push(id); t.active = true; }
         if (props.url) {
           let url = props.url;
           log.navigations.push(url);
@@ -55,7 +55,8 @@ function makeEnv(scn) {
           const page = Number(new URL(t.url).searchParams.get('page'));
           return scn.pages(page, t.url);
         }
-        if (msg.type === 'LI_EXTRACT_CONTACT') return typeof scn.contact === 'function' ? scn.contact(t.url) : scn.contact;
+        if (msg.type === 'LI_EXTRACT_CONTACT') log.extractMsgs.push(msg);
+        if (msg.type === 'LI_EXTRACT_CONTACT') return typeof scn.contact === 'function' ? scn.contact(t.url, t) : scn.contact;
         throw new Error('unexpected message ' + msg.type);
       },
     },
@@ -67,6 +68,12 @@ function makeEnv(scn) {
     const u = new URL(url);
     const body = opts.body ? JSON.parse(opts.body) : null;
     const json = (data, status = 200) => ({ ok: status < 400, status, json: async () => data });
+    // One person at a time as soon as their email is read. Scenarios that do not set `stream` model an older SkillMate
+    // without this endpoint (404): the extension must then send everyone with the page, as it always did.
+    if (method === 'POST' && u.pathname.endsWith('/profile')) {
+      if (!scn.stream) return json({ message: 'Not Found' }, 404);
+      log.streams.push(body); return json({ accepted: body.profiles.length }, 202);
+    }
     if (method === 'POST' && u.pathname.endsWith('/profiles')) { log.posts.push(body); return json({ accepted: body.profiles.length }, 202); }
     if (method === 'POST' && u.pathname.endsWith('/fail')) { log.fails.push(body); return json({}); }
     if (method === 'POST' && u.pathname.includes('/contact')) { log.contacts.push({ path: u.pathname, body }); return json({ data: { candidate_error: null } }); }
@@ -93,7 +100,7 @@ function makeEnv(scn) {
     return new Promise((resolve) => chrome._onMessage({ type: 'LI_SKILLMATE', payload }, { tab: { id: 99 } }, resolve));
   }
   const popup = (type) => new Promise((resolve) => chrome._onMessage({ type }, {}, resolve));
-  return { log, send, popup, store, tabs, setPauses: (r) => { ctx.SMLinkedinConfig.PROFILE_PAUSE_SECONDS = r; } };
+  return { log, send, popup, store, tabs, setConfig: (c) => Object.assign(ctx.SMLinkedinConfig, c), setPauses: (r) => { ctx.SMLinkedinConfig.PROFILE_PAUSE_SECONDS = r; } };
 }
 
 const PLAN = { primary_keywords: 'Python AND Django', narrowed_keywords: '', use_narrowed: false, locations: ['Chennai'] };
@@ -118,7 +125,7 @@ const check = (name, fn) => test(name, fn);
     const pages = env.log.navigations.filter((u) => u.includes('/search/results/people/')).map((u) => new URL(u).searchParams.get('page'));
     assert.deepEqual(pages, ['1', '2', '3']);
     const q = new URL(env.log.navigations.find((u) => u.includes('/search/results/'))).searchParams.get('keywords');
-    assert.equal(q, '(Python AND Django) AND ("Chennai")');
+    assert.equal(q, 'Python AND Django');                                     // the JD's cities are not searched on LinkedIn
     assert.deepEqual(env.log.fails, []);
     assert.equal(env.log.events.filter((e) => e.stage === 'scraping').length >= 3, true);
     assert.equal(env.store.has('skillmateLiJob'), false, 'job should be cleared');
@@ -210,7 +217,9 @@ const check = (name, fn) => test(name, fn);
     const r = await env.send({ type: 'LINKEDIN_REVEAL', requestId: 'x', profileId: 'PID', name: 'Asha', sourceLink: 'https://www.linkedin.com/in/asha/?x=1', apiBase: 'http://localhost:8000/api', token: 'T' });
     assert.deepEqual([r.type, r.ok, r.reason], ['LINKEDIN_REVEAL_RESULT', true, undefined]);
     assert.deepEqual(env.log.contacts[0], { path: '/api/sourcing/profiles/PID/contact', body: { email: 'asha@gmail.com', phone: '9000000001' } });
-    assert.ok(env.log.navigations.includes('https://www.linkedin.com/in/asha/overlay/contact-info/'));
+    assert.ok(env.log.navigations.includes('https://www.linkedin.com/in/asha'), 'the profile was not opened');
+    assert.ok(!env.log.navigations.some((u) => u.includes('/overlay/')), 'the dialog\'s own address must not be loaded directly');
+    assert.ok(env.log.extractMsgs.every((m) => m.open === true), 'the page was not asked to open the dialog');
     assert.equal(env.tabs.size, 0);
   });
 
@@ -338,13 +347,14 @@ check('failures that have no page to describe send an empty debug string', async
 
 // -- candidates are taken only with an email -----------------------------------------------------------------------
 
-const slugOf = (url) => (url.match(/\/in\/([^/]+)\//) || [])[1];
-const overlayNavs = (env) => env.log.navigations.filter((u) => u.includes('/overlay/contact-info/'));
+const slugOf = (url) => (url.match(/\/in\/([^/?#]+)/) || [])[1];
+// the candidates' profile pages that were opened (the content script clicks "Contact info" there)
+const overlayNavs = (env) => env.log.navigations.filter((u) => u.includes('/in/') && !u.includes('/search/'));
 const person = (i, degree) => ({ name: `P${i}`, source_link: `https://www.linkedin.com/in/p${i}`, source: 'LinkedIn', skills: [], experiences: [], connection_degree: degree });
 const pageOf = (people) => ({ ok: true, profiles: people, ended: false, diag: { cards: people.length, anchors: people.length, title: 'Search | LinkedIn' } });
 // p1, p3 share an email; p2 has a dialog with nothing in it; p4 would, but is never opened
 const EMAILS = { p1: 'one@example.com', p3: 'three@example.com' };
-const dialogFor = (url) => ({ ok: true, email: EMAILS[slugOf(url)] || '', phone: slugOf(url) === 'p1' ? '9000000001' : '', dialog: true });
+const dialogFor = (url) => ({ ok: true, email: EMAILS[slugOf(url)] || '', phone: slugOf(url) === 'p1' ? '9000000001' : '', dialog: true, rows: true });
 
 check('email-only: only 1st-degree people are opened, only those with an email are sent, and the count of people seen goes along', async () => {
   const env = makeEnv({
@@ -366,11 +376,41 @@ check('email-only: only 1st-degree people are opened, only those with an email a
   assert.ok(env.log.events.some((e) => e.stage === 'contacts' && e.total === 3), 'no progress was reported while reading contacts');
 });
 
+check('email-only: each person is sent the moment their email is read, and the page post only closes the page', async () => {
+  const env = makeEnv({
+    emailOnly: true, stream: true,
+    pages: () => pageOf([person(1, '1st'), person(2, '1st'), person(3, '1st'), person(4, '2nd')]),
+    contact: dialogFor,
+    runState: () => ({ status: 'done', profiles_shortlisted: 2 }),
+  });
+  await env.send({ ...SOURCE, plan: { primary_keywords: 'Python AND Django', locations: [] }, pageFrom: 1, pageTo: 1 });
+  assert.ok(await waitUntil(() => env.log.events.some((e) => e.stage === 'done')), 'run never finished');
+  assert.deepEqual(env.log.streams.map((x) => x.profiles.map((y) => y.email)), [['one@example.com'], ['three@example.com']]);
+  assert.equal(env.log.streams[0].profiles[0].phone, '9000000001');
+  assert.deepEqual(env.log.posts[0].profiles, [], 'people already sent one by one must not be sent again');
+  assert.equal(env.log.posts[0].scanned, 4);                                       // the page still reports how many people it showed
+  assert.match(env.log.posts[0].debug, /emails=2 streamed=2/);
+  assert.deepEqual(env.log.fails, []);
+});
+
+check('email-only: when SkillMate cannot take people one by one, they go with the page', async () => {
+  const env = makeEnv({
+    emailOnly: true, stream: false,
+    pages: () => pageOf([person(1, '1st'), person(3, '1st')]), contact: dialogFor,
+    runState: () => ({ status: 'done', profiles_shortlisted: 2 }),
+  });
+  await env.send({ ...SOURCE, plan: { primary_keywords: 'Python AND Django', locations: [] }, pageFrom: 1, pageTo: 1 });
+  assert.ok(await waitUntil(() => env.log.events.some((e) => e.stage === 'done')), 'run never finished');
+  assert.deepEqual(env.log.streams, []);
+  assert.deepEqual(env.log.posts[0].profiles.map((x) => x.email), ['one@example.com', 'three@example.com']);
+  assert.match(env.log.posts[0].debug, /streamed=0/);
+});
+
 check('email-only: a page where nobody shares an email is still posted, so SkillMate counts it and asks for the next one', async () => {
   const env = makeEnv({
     emailOnly: true,
     pages: (p) => pageOf([person(10 * p + 1, '1st'), person(10 * p + 2, '2nd')]),
-    contact: () => ({ ok: true, email: '', phone: '', dialog: true }),
+    contact: () => ({ ok: true, email: '', phone: '', dialog: true, rows: true }),
     runState: (posted) => (posted < 2 ? { status: 'scraping', next_action: 'next_page', profiles_shortlisted: 0, phase: 'hunting' }
       : { status: 'done', profiles_shortlisted: 0 }),
   });
@@ -430,4 +470,116 @@ check('with EMAIL_ONLY off nothing changes: every card is sent, no contact dialo
   assert.equal(overlayNavs(env).length, 0);
   assert.deepEqual(env.log.posts[0].profiles.map((x) => x.name), ['P1', 'P2']);
   assert.ok(searchNavs(env).every((u) => !new URL(u).searchParams.has('network')));
+});
+
+// -- the JD's experience range is applied to every LinkedIn candidate (location and CTC are not) ------------------------------
+
+const JD_PLAN = { primary_keywords: 'Python AND Django', locations: ['Chennai'], experience_min: 3, experience_max: 6, ctc_max_lacs: 18 };
+const placed = (i, location) => ({ ...person(i, '1st'), location });
+const exp = (years, lowerBound = false) => ({
+  years, lowerBound, text: `${Math.floor(years)} yrs`, positions: [{ title: 'Developer', company: 'Acme', duration: 'Jan 2020 - Present', is_current: true, starts_at: {}, ends_at: {} }],
+});
+// p1 fits; p2 lives elsewhere (it does not matter); p3 is too senior; p4 fits; p5 shows no experience; p6 shows 1.5 yrs but not all of his history
+const EXPERIENCE = { p1: exp(5), p3: exp(8), p4: exp(4.5), p6: exp(1.5, true) };
+const withProfile = (url) => ({ ok: true, email: `${slugOf(url)}@example.com`, phone: '', dialog: true, rows: true, experience: EXPERIENCE[slugOf(url)] || null });
+const FILTER_PAGE = () => pageOf([placed(1, 'Chennai, Tamil Nadu, India'), placed(2, 'Hyderabad, Telangana, India'), placed(3, 'Greater Chennai Area'),
+  placed(4, 'Chennai'), placed(5, 'Chennai'), placed(6, 'Chennai')]);
+
+check('experience range: over-experienced people are left out, unknown and partial histories are kept, the city is ignored', async () => {
+  const env = makeEnv({ emailOnly: true, pages: FILTER_PAGE, contact: withProfile, runState: () => ({ status: 'done', profiles_shortlisted: 2 }) });
+  await env.send({ ...SOURCE, plan: JD_PLAN, pageFrom: 1, pageTo: 1 });
+  assert.ok(await waitUntil(() => env.log.events.some((e) => e.stage === 'done')), 'run never finished');
+  assert.deepEqual(overlayNavs(env).map(slugOf), ['p1', 'p2', 'p3', 'p4', 'p5', 'p6']);    // Hyderabad (p2) is opened too: the city plays no part
+  const post = env.log.posts[0];
+  assert.deepEqual(post.profiles.map((x) => x.name), ['P1', 'P2', 'P4', 'P5', 'P6']);       // only p3 (8 yrs) is over the 3-6 range
+  assert.equal(post.scanned, 6);
+  const byName = Object.fromEntries(post.profiles.map((x) => [x.name, x]));
+  assert.deepEqual([byName.P1.experience_years, byName.P1.total_experience, byName.P1.experience_is_lower_bound], [5, '5 yrs', false]);
+  assert.equal(byName.P1.experiences[0].company, 'Acme');
+  assert.equal(byName.P2.experience_years, undefined);                                      // unknown stays unknown
+  assert.equal(byName.P6.experience_is_lower_bound, true);                                  // kept, and flagged so SkillMate won't call him too junior
+  assert.match(post.debug, /out-of-range=1/);
+  assert.ok(!new URL(searchNavs(env)[0]).searchParams.get('keywords').includes('Chennai'), 'the city reached the LinkedIn search');
+});
+
+check('experience range: a plan with no range filters nothing', async () => {
+  const env = makeEnv({ emailOnly: true, pages: FILTER_PAGE, contact: withProfile, runState: () => ({ status: 'done', profiles_shortlisted: 5 }) });
+  await env.send({ ...SOURCE, plan: { primary_keywords: 'Python AND Django', locations: [] }, pageFrom: 1, pageTo: 1 });
+  assert.ok(await waitUntil(() => env.log.events.some((e) => e.stage === 'done')));
+  assert.deepEqual(env.log.posts[0].profiles.map((x) => x.name), ['P1', 'P2', 'P3', 'P4', 'P5', 'P6']);
+});
+
+check('the experience filter can be switched off (FILTER_BY_EXPERIENCE)', async () => {
+  const env = makeEnv({ emailOnly: true, pages: FILTER_PAGE, contact: withProfile, runState: () => ({ status: 'done', profiles_shortlisted: 5 }) });
+  env.setConfig({ FILTER_BY_EXPERIENCE: false });
+  await env.send({ ...SOURCE, plan: JD_PLAN, pageFrom: 1, pageTo: 1 });
+  assert.ok(await waitUntil(() => env.log.events.some((e) => e.stage === 'done')));
+  assert.equal(env.log.posts[0].profiles.length, 6);
+});
+
+// -- reading dialogs honestly ------------------------------------------------------------------------------------------------
+
+const unread = { ok: true, email: '', phone: '', dialog: false, rows: false, experience: null, diag: { found: false, via: '', rows: false, visible: 'hidden', textLen: 0, sample: '' } };
+
+check('every page is recorded: what the cards were, how many dialogs were read, how many emails', async () => {
+  const env = makeEnv({
+    emailOnly: true, pages: () => pageOf([person(1, '1st'), person(2, '1st'), person(4, '2nd'), person(5, '')]), contact: dialogFor,
+    runState: () => ({ status: 'done', profiles_shortlisted: 1 }),
+  });
+  await env.send({ ...SOURCE, plan: { primary_keywords: 'Python AND Django', locations: [] }, pageFrom: 1, pageTo: 1 });
+  assert.ok(await waitUntil(() => env.log.events.some((e) => e.stage === 'done')));
+  assert.match(env.log.posts[0].debug, /^contacts p1: cards=4 degrees=1st:2\/2nd:1\/3rd:0\/\?:1 asked=3 opened=3 readable=3 emails=1 streamed=\d+ out-of-range=0$/);
+});
+
+check('dialogs that cannot be read are NOT reported as "nobody shared an email": the run fails with the evidence', async () => {
+  const env = makeEnv({
+    emailOnly: true, pages: () => pageOf([1, 2, 3, 4, 5, 6, 7, 8].map((i) => person(i, '1st'))), contact: () => unread, runState: () => ({}),
+  });
+  await env.send({ ...SOURCE, plan: { primary_keywords: 'Python AND Django', locations: [] }, pageFrom: 1, pageTo: 2 });
+  assert.ok(await waitUntil(() => env.log.fails.length > 0));
+  assert.match(env.log.fails[0].detail, /contacts_unreadable/);
+  assert.match(env.log.fails[0].debug, /readable=0/);
+  assert.match(env.log.fails[0].debug, /foregrounded/);
+  assert.match(env.log.fails[0].debug, /found=false rows=false/);
+  assert.equal(env.log.posts.length, 0, 'an empty page must not be posted as "no emails"');
+  assert.ok(overlayNavs(env).length <= 7, 'it should give up after a handful, not read all eight');
+});
+
+check('LinkedIn that does not render in a background tab is handled: the tab is brought to the front and the read repeated', async () => {
+  const env = makeEnv({
+    emailOnly: true, pages: () => pageOf([1, 2, 3, 4].map((i) => person(i, '1st'))), runState: () => ({ status: 'done', profiles_shortlisted: 2 }),
+    contact: (url, tab) => (tab.active ? { ...dialogFor(url), experience: null } : unread),   // only a visible tab renders
+  });
+  await env.send({ ...SOURCE, plan: { primary_keywords: 'Python AND Django', locations: [] }, pageFrom: 1, pageTo: 1 });
+  assert.ok(await waitUntil(() => env.log.events.some((e) => e.stage === 'done')), 'run never finished');
+  assert.deepEqual(env.log.fails, []);
+  assert.deepEqual(env.log.posts[0].profiles.map((x) => x.name), ['P1', 'P3']);              // p1, p3 have emails in the mock
+  assert.match(env.log.posts[0].debug, /foregrounded/);
+  assert.ok(env.log.activated.length >= 1);
+});
+
+check('some dialogs unreadable among readable ones is normal: only a page where NONE could be read fails', async () => {
+  const env = makeEnv({
+    emailOnly: true, pages: () => pageOf([1, 2, 3, 4].map((i) => person(i, '1st'))), runState: () => ({ status: 'done', profiles_shortlisted: 1 }),
+    contact: (url) => (slugOf(url) === 'p2' ? unread : dialogFor(url)),
+  });
+  await env.send({ ...SOURCE, plan: { primary_keywords: 'Python AND Django', locations: [] }, pageFrom: 1, pageTo: 1 });
+  assert.ok(await waitUntil(() => env.log.events.some((e) => e.stage === 'done')));
+  assert.deepEqual(env.log.fails, []);
+  assert.match(env.log.posts[0].debug, /opened=4 readable=3 emails=2/);
+});
+
+// -- candidates are opened at their profile and the page opens "Contact info" -------------------------------------------------
+
+check('email-only: each candidate is opened at their profile and the page is asked to open the dialog', async () => {
+  const env = makeEnv({
+    emailOnly: true, pages: () => pageOf([person(1, '1st'), person(3, '1st')]), contact: dialogFor,
+    runState: () => ({ status: 'done', profiles_shortlisted: 2 }),
+  });
+  await env.send({ ...SOURCE, plan: { primary_keywords: 'Python AND Django', locations: [] }, pageFrom: 1, pageTo: 1 });
+  assert.ok(await waitUntil(() => env.log.events.some((e) => e.stage === 'done')), 'run never finished');
+  assert.deepEqual(overlayNavs(env), ['https://www.linkedin.com/in/p1', 'https://www.linkedin.com/in/p3']);
+  assert.ok(!env.log.navigations.some((u) => u.includes('/overlay/')), 'the dialog\'s own address was loaded directly: LinkedIn shows no dialog then');
+  assert.equal(env.log.extractMsgs.length, 2);
+  assert.ok(env.log.extractMsgs.every((m) => m.open === true));
 });

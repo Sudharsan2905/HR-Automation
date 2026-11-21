@@ -11,9 +11,13 @@ import type { SourcingSearchPlan } from "@/types/sourcing";
 
 // The oldest extension build this page works with. 1.1.0 added the search ladder (broaden the search when LinkedIn
 // finds nobody); 1.2.0 takes a candidate only with an email (it opens each contact dialog), which SkillMate now insists
-// on: an older build would send people without one and get nothing in. Chrome does NOT reload an unpacked extension when
+// on: an older build would send people without one and get nothing in. 1.3.0 applies the JD's location and experience
+// range to each candidate (older builds ignore both). 1.4.0 reads the contact dialog reliably (it waits for the rows, finds
+// the dialog wherever LinkedIn puts it) and reports "could not read" instead of "nobody shared an email". 1.5.0 opens the
+// profile and clicks "Contact info" (the dialog's own address, loaded directly, shows no dialog), so 1.4.0 and older read
+// nothing. Chrome does NOT reload an unpacked extension when
 // its files change, so after an update the old code keeps running until it is reloaded at chrome://extensions: refuse it.
-export const LINKEDIN_EXTENSION_MIN_VERSION = "1.2.0";
+export const LINKEDIN_EXTENSION_MIN_VERSION = "1.5.0";
 
 /** -1 / 0 / 1 like a comparator, for dotted numeric versions ("1.10.0" > "1.9.0"). */
 export function compareVersions(a: string, b: string): number {

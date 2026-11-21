@@ -61,15 +61,12 @@ test('search keywords come from the plan (narrowed only when the plan says so)',
   assert.equal(C.searchKeywords(null), '');
 });
 
-test('search query adds the JD cities as an OR group', () => {
+test('the JD\'s cities play no part in a LinkedIn search (only experience is applied to LinkedIn candidates)', () => {
   const plan = { primary_keywords: '(React OR "React.js") AND Python', narrowed_keywords: '', use_narrowed: false, locations: [] };
   assert.equal(C.buildSearchQuery(plan), '(React OR "React.js") AND Python');
-  assert.equal(C.buildSearchQuery({ ...plan, locations: ['Chennai', ' Coimbatore '] }),
-    '((React OR "React.js") AND Python) AND ("Chennai" OR "Coimbatore")');
-  assert.equal(C.buildSearchQuery({ ...plan, locations: ['Chen"nai'] }), '((React OR "React.js") AND Python) AND ("Chennai")');
+  assert.equal(C.buildSearchQuery({ ...plan, locations: ['Chennai', ' Coimbatore '] }), '(React OR "React.js") AND Python');
   assert.equal(C.buildSearchQuery({ primary_keywords: '' }), '');
 });
-
 test('search url encodes the query and pages by number', () => {
   const plan = { primary_keywords: 'Python AND "Machine Learning"', locations: [] };
   const url = new URL(C.buildSearchUrl(plan, 3));
@@ -227,14 +224,11 @@ test('the failing JD: soft-skill groups are removed, then each step is broader t
   for (let i = 1; i < levels.length; i++) assert.ok(levels[i].length < levels[i - 1].length);
 });
 
-test('cities are the first thing dropped', () => {
-  const levels = C.searchLevels({ ...FULL_STACK_PLAN, locations: ['Chennai', 'Coimbatore'] });
-  assert.match(levels[0], /\) AND \("Chennai" OR "Coimbatore"\)$/);
-  assert.ok(!/Chennai/.test(levels[1]));
-  assert.equal(levels[1].split(' AND ').length, 8);          // all technical groups, no cities
-  assert.equal(levels.length, 5);
+test('cities change nothing about the search steps', () => {
+  const withCities = C.searchLevels({ ...FULL_STACK_PLAN, locations: ['Chennai', 'Coimbatore'] });
+  assert.deepEqual(withCities, C.searchLevels(FULL_STACK_PLAN));
+  assert.ok(!withCities.some((q) => /Chennai|Coimbatore/.test(q)));
 });
-
 test('a short plan has a single step, and steps never repeat', () => {
   assert.deepEqual(C.searchLevels({ primary_keywords: 'Python AND Django' }), ['Python AND Django']);
   assert.deepEqual(C.searchLevels({ primary_keywords: 'Python' }), ['Python']);
@@ -279,4 +273,97 @@ test('only people who could share an email are worth opening', () => {
 test('progress text while contact details are read', () => {
   assert.equal(C.stageLabel('contacts', 2), 'Checking contact details on page 2\u2026');
   assert.equal(C.stageLabel('contacts'), 'Checking contact details\u2026');
+});
+
+// -- the JD's filters: location and experience ------------------------------------------------------------------------
+
+const NOW = new Date(2026, 10, 21);   // 21 Nov 2026
+
+test('experience: the section\'s date ranges become total years', () => {
+  const e = C.parseExperience([
+    'Experience',
+    'Senior Software Engineer', 'Zoho \u00b7 Full-time', 'Jan 2020 - Present \u00b7 6 yrs 11 mos', 'Chennai, Tamil Nadu, India \u00b7 Hybrid',
+    'Software Engineer', 'Freshworks \u00b7 Full-time', 'Jun 2017 - Dec 2019 \u00b7 2 yrs 7 mos',
+  ], NOW);
+  assert.equal(e.positions.length, 2);
+  assert.deepEqual([e.positions[0].title, e.positions[0].company, e.positions[0].is_current], ['Senior Software Engineer', 'Zoho', true]);
+  assert.deepEqual([e.positions[1].title, e.positions[1].company], ['Software Engineer', 'Freshworks']);
+  assert.equal(e.months, (6 * 12 + 11) + (2 * 12 + 7));                       // Jun 2017 - Dec 2019, Jan 2020 - Nov 2026
+  assert.equal(e.years, 9.5);
+  assert.equal(e.lowerBound, false);
+});
+
+test('experience: overlapping jobs are not counted twice, and gaps are not counted', () => {
+  const overlap = C.parseExperience(['Dev', 'A \u00b7 Full-time', 'Jan 2020 - Dec 2021', 'Lead', 'B \u00b7 Part-time', 'Jul 2021 - Dec 2022'], NOW);
+  assert.equal(overlap.months, 36);                                            // Jan 2020 - Dec 2022
+  const gap = C.parseExperience(['Dev', 'A \u00b7 Full-time', 'Jan 2015 - Dec 2015', 'Dev', 'B \u00b7 Full-time', 'Jan 2020 - Dec 2020'], NOW);
+  assert.equal(gap.months, 24);
+});
+
+test('experience: year-only dates, "Present", repeated lines and en dashes are read', () => {
+  assert.equal(C.parseExperience(['Dev', 'A \u00b7 Full-time', '2019 \u2013 2021'], NOW).months, 36);
+  assert.equal(C.parseExperience(['Dev', 'A \u00b7 Full-time', 'Mar 2024 \u2013 Present'], NOW).months, 33);   // Mar 2024 - Nov 2026, inclusive
+  const dup = C.parseExperience(['Dev', 'Dev', 'A \u00b7 Full-time', 'A \u00b7 Full-time', 'Jan 2020 - Dec 2020', 'Jan 2020 - Dec 2020'], NOW);
+  assert.equal(dup.positions.length, 1);
+  assert.equal(dup.months, 12);
+});
+
+test('experience: nothing readable is unknown, and a partial list is marked as a lower bound', () => {
+  assert.equal(C.parseExperience(['Experience', 'No dates here'], NOW), null);
+  assert.equal(C.parseExperience([], NOW), null);
+  assert.equal(C.parseExperience(undefined, NOW), null);
+  const partial = C.parseExperience(['Dev', 'A \u00b7 Full-time', 'Jan 2024 - Present', 'Show all 7 experiences'], NOW);
+  assert.equal(partial.lowerBound, true);
+});
+
+test('experience range: out-of-range is refused, unknown and partial are handled carefully', () => {
+  const full = (years) => ({ years, lowerBound: false });
+  assert.equal(C.experienceFits(3, 6, full(4)), true);
+  assert.equal(C.experienceFits(3, 6, full(3)), true);
+  assert.equal(C.experienceFits(3, 6, full(6)), true);
+  assert.equal(C.experienceFits(3, 6, full(2.5)), false);                      // too junior
+  assert.equal(C.experienceFits(3, 6, full(8)), false);                        // too senior
+  assert.equal(C.experienceFits(3, 6, { years: 1.5, lowerBound: true }), true); // history cut off: may well be 3+
+  assert.equal(C.experienceFits(3, 6, { years: 8, lowerBound: true }), false);  // already past the maximum
+  assert.equal(C.experienceFits(3, 6, null), true);
+  assert.equal(C.experienceFits(null, 6, full(1)), true);
+  assert.equal(C.experienceFits(3, null, full(20)), true);
+});
+
+// -- reading cards and dialogs more reliably -------------------------------------------------------------------------------
+
+test('a card\'s own degree is the first one on it: a mutual connection\'s degree must not replace it', () => {
+  const p = C.parseResultLines(['Asha Kumar', '\u2022 1st', 'Python Developer', 'Chennai', 'Followed by Ravi \u2022 2nd', 'Priya \u2022 3rd+']);
+  assert.equal(p.degree, '1st');
+  const inline = C.parseResultLines(['Asha Kumar \u2022 1st', 'Python Developer', 'Ravi \u2022 2nd']);
+  assert.equal(inline.degree, '1st');
+  assert.equal(C.canShareEmail(p), true);
+});
+
+test('a dialog whose rows have not loaded yet is told apart from one that has', () => {
+  // title + promo only: the contact rows are still loading
+  assert.equal(C.contactRowsLoaded(['Contact info', 'Get up to 5.7x replies when you message with InMail', 'Reactivate Premium: 50% Off']), false);
+  assert.equal(C.contactRowsLoaded(['Contact info', 'Asha\u2019s profile', 'linkedin.com/in/asha']), true);   // shares nothing, but rows are up
+  assert.equal(C.contactRowsLoaded(['Contact info', 'Connected since', 'Oct 9, 2026']), true);
+  assert.equal(C.contactRowsLoaded(['Contact info', 'Email', 'a@b.com']), true);
+  assert.equal(C.contactRowsLoaded([]), false);
+});
+
+test('an email is found even when the dialog\'s headings are not the usual ones', () => {
+  assert.deepEqual(C.parseContactOverlay(['Contact info', 'E-mail address', 'asha@example.com'], []), { email: 'asha@example.com', phone: '' });
+  assert.deepEqual(C.parseContactOverlay(['Contact info', 'Reach me at ravi@example.com'], []), { email: 'ravi@example.com', phone: '' });
+  assert.deepEqual(C.parseContactOverlay(['Contact info', 'Write to help@linkedin.com'], []), { email: '', phone: '' });   // never LinkedIn's own
+});
+
+test('text kept for the run record has emails and long numbers masked', () => {
+  const t = C.redact('Contact info  Email asha@example.com  Phone 9000000001 (Mobile)  Connected since Oct 9, 2026', 200);
+  assert.ok(!/asha@example\.com|9000000001/.test(t));
+  assert.match(t, /<email>/);
+  assert.match(t, /<num>/);
+  assert.equal(C.redact('x'.repeat(500), 50).length, 50);
+  assert.equal(C.redact(undefined), '');
+});
+
+test('the progress and error text for dialogs that could not be read', () => {
+  assert.match(C.stageLabel('error', null, null, 'contacts_unreadable'), /could not read LinkedIn.s contact dialogs/);
 });

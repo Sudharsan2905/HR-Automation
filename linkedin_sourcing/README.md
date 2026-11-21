@@ -49,11 +49,17 @@ with `EMAIL_ONLY` on (the default, in `config.js`):
 
 1. The search is limited to your 1st-degree connections (LinkedIn's "Connections: 1st" filter). Any 2nd or 3rd-degree
    card that still appears is skipped without opening its profile.
-2. For every remaining card the extension opens that person's contact dialog
-   (`/in/<name>/overlay/contact-info/`) in a work tab, with a pause of a few seconds between profiles, and reads the email.
+2. For every remaining card the extension opens that person's **profile** in a work tab and clicks **Contact info**, the same
+   as you would, then reads the email from the dialog (with a pause of a few seconds between profiles). It does not load the
+   dialog's own address (`/in/<name>/overlay/contact-info/`) directly: LinkedIn shows the profile without the dialog when
+   that address is opened in a fresh tab, which is why v1.4.0 and older read nothing.
 3. **Only the people whose dialog gave an email are sent to SkillMate.** Everyone else is left out, and SkillMate refuses a
    LinkedIn profile without an email even if some other build sent it. The page is still reported (`scanned`), so a page
    where nobody shared an email counts as read and the run moves on.
+4. **Each person is sent the moment their email is read** (`POST /sourcing/runs/{id}/profile`, v1.5.0+), not when the
+   whole page is done. SkillMate stores and screens them at once, so they appear in the Candidates table one by one while
+   the page is still being read, and the page's own post at the end only closes the page. If SkillMate does not have that
+   endpoint (an older backend) or a send fails, the person is sent with the page as before.
 
 Because every shortlisted LinkedIn candidate has an email, **they are not auto-selected**: no invite goes out until you
 click **Select** (see `HIRING_AUTO_SELECT_LINKEDIN` in the backend settings). A run that reads people but finds no
@@ -62,6 +68,30 @@ emails ends with a message saying how many connections were checked and how many
 This is slower and touches more LinkedIn pages than before: roughly one profile view per 1st-degree card, ~10 per page,
 about 4 pages per click. If LinkedIn shows a CAPTCHA or a limit notice while contacts are read, the run stops and the
 tab stays in front. Set `EMAIL_ONLY: false` to send every card again (emails are then read when you click Select).
+
+## Only the JD's experience is applied (not location, not CTC)
+LinkedIn's standard people search has **no years-of-experience filter**, so the JD's experience range is applied by the
+extension itself (`FILTER_BY_EXPERIENCE`, default on). The profile page sits behind the contact dialog, so the extension
+reads its **Experience** section, adds up the date ranges (overlapping jobs are counted once) and sends the total as
+`experience_years`. Someone outside the range is left out, and SkillMate's scorer enforces the same range. If LinkedIn shows
+only some positions ("Show all N experiences") the total is a floor: it can prove someone too senior, never too junior. If
+no dates can be read the person is kept.
+
+**Location and CTC are not used for LinkedIn candidates:** the search carries no city, no card is skipped for its location,
+and salary is never shown on LinkedIn. (Naukri still applies both.)
+
+## Reading the contact dialog reliably
+"0 shared an email" must mean the dialogs were read and held no email, never that they could not be read. So:
+- The reader waits for the dialog's **contact rows**, not just the dialog: its title and an InMail promo appear first and the
+  email arrives a moment later. It finds the dialog by its markup (`role="dialog"`, `<dialog>`, `aria-modal`, shadow roots) or,
+  failing that, by its "Contact info" heading, and accepts any valid address in it.
+- If LinkedIn does not render in a background tab (three unreadable dialogs in a row) the work tab is brought to the front
+  once and the people it could not read are read again.
+- If dialogs still cannot be read the run **fails with "could not read LinkedIn's contact dialogs"** instead of reporting an
+  empty result.
+- Every page leaves a one-line record on the run (`debug`): cards, connection degrees, dialogs opened and really read,
+  emails found, people over the experience range, and a masked sample of any dialog it could not read. No email or phone
+  number is ever stored in it.
 
 ## One email per person
 If the same person is found on Naukri and on LinkedIn they get **one** Level 1 invite. A LinkedIn card never shows an

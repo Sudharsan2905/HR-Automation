@@ -47,6 +47,19 @@ async def _resolve_share(db: AsyncIOMotorDatabase, share_link: str) -> tuple[dic
     return share, assessment
 
 
+async def find_my_share_link(db: AsyncIOMotorDatabase, candidate_id: str) -> str | None:
+    """Share link of the newest active assessment this candidate was invited to (None if there is none)."""
+    user = await User.get(candidate_id)
+    email = (user.email if user else "").strip().lower()
+    if not email:
+        return None
+    cursor = db[l1db.SHARES].find({"is_active": True, "restricted_emails": email}).sort("_id", -1)
+    async for share in cursor:
+        if await db[l1db.ASSESSMENTS].find_one({"_id": share["assessment_id"], "is_active": True}, {"_id": 1}):
+            return share["share_link"]
+    return None
+
+
 async def get_candidate_assessment(db: AsyncIOMotorDatabase, share_link: str) -> dict:
     """Assessment metadata by share link, without internal question ids."""
     _, assessment = await _resolve_share(db, share_link)

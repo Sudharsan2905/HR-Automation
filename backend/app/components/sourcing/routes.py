@@ -4,7 +4,14 @@ from app.components.auth.dependencies import get_effective_user
 from app.components.auth.models import User
 from app.components.sourcing import service
 from app.components.sourcing.models import SourcingRequirements, SourcingSearchPlan
-from app.components.sourcing.schemas import ContactIn, ProfilesIn, RunFailIn, StartRunIn, StatusUpdateIn
+from app.components.sourcing.schemas import (
+    ContactIn,
+    ProfileStreamIn,
+    ProfilesIn,
+    RunFailIn,
+    StartRunIn,
+    StatusUpdateIn,
+)
 
 router = APIRouter(prefix="/sourcing", tags=["Sourcing"])
 
@@ -72,7 +79,14 @@ async def receive_profiles(run_id: str, body: ProfilesIn, background_tasks: Back
     """The extension posts one results page (ResDex or LinkedIn); screening runs in the background, then the
     run asks for the next page (next_action="next_page") or finishes."""
     return await service.receive_profiles(run_id, body.profiles, user, background_tasks, ended=body.ended,
-                                          source_url=body.source_url, search_level=body.search_level, scanned=body.scanned)
+                                          source_url=body.source_url, search_level=body.search_level, scanned=body.scanned, debug=body.debug)
+
+
+@router.post("/runs/{run_id}/profile", status_code=202)
+async def receive_stream(run_id: str, body: ProfileStreamIn, user: User = Depends(get_effective_user)):
+    """The extension sends people of the page it is reading one by one; each is stored and screened at once so it
+    shows in the table straight away. The page's own post (/profiles) still closes the page afterwards."""
+    return await service.receive_stream(run_id, body.profiles, user)
 
 
 @router.post("/runs/{run_id}/fail")

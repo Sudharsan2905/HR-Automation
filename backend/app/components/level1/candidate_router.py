@@ -41,6 +41,12 @@ async def _read_upload(upload: UploadFile | None, allowed: set[str], max_bytes: 
     return content
 
 
+@router.get("/my-assessment")
+async def my_assessment(user: Candidate) -> dict:
+    """The assessment link for the signed-in candidate (null when none was assigned)."""
+    return {"share_link": await candidate_service.find_my_share_link(get_db(), str(user.id))}
+
+
 @router.get("/assessment/{share_link}")
 async def get_assessment(share_link: str, user: Candidate) -> dict:
     """Assessment metadata for the share link."""

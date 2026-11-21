@@ -229,13 +229,24 @@ async function finishRun(job, run) {
   }
 }
 
+// One person to SkillMate as soon as their email is read (see collectEmails). True when SkillMate took them; on any failure
+// (an older SkillMate without this endpoint, a network blip) false, and the person is sent with the page instead.
+async function streamCandidate(job, card) {
+  try { await api(job, `/sourcing/runs/${job.runId}/profile`, { profiles: [card] }); }
+  catch (e) { return false; }
+  const cur = await getJob();
+  if (cur && cur.runId === job.runId) await setJob({ ...cur, profilesSent: (cur.profilesSent || 0) + 1 });
+  return true;
+}
+
 // One results page to SkillMate; wait while it is screened. Returns 'next' | 'finished' | 'stopped' | 'failed'.
-async function postPage(job, page, profiles, ended, sourceUrl, scanned) {
+async function postPage(job, page, profiles, ended, sourceUrl, scanned, debug) {
   await emit(job, 'screening', { page, pageTo: job.pageTo });
   try {
     await api(job, `/sourcing/runs/${job.runId}/profiles`, {
       profiles, ended: !!ended, source_url: sourceUrl || '', search_level: (await getJob())?.level ?? job.level ?? 0,
       scanned,   // people the page showed; `profiles` holds only those with an email
+      debug: String(debug || '').slice(0, 900),   // what was read on this page, kept on the run for support
     });
     const cur = (await getJob()) || job;
     await setJob({ ...cur, pagesSent: (cur.pagesSent || 0) + 1, profilesSent: (cur.profilesSent || 0) + profiles.length });
@@ -270,49 +281,137 @@ function describeAttempt(job, page, res) {
     + `${res?.noResults ? ' no-results-page' : ''}${d.timedOut ? ' timed-out' : ''} anchors=${d.anchors ?? '?'} title="${d.title || ''}"${text}`;
 }
 
-// Open one candidate's contact dialog in the tab and read the phone/email they share with the recruiter.
-// Returns {email, phone} (both '' when nothing is shared) or {block} when LinkedIn stops us.
+// Open one candidate's contact dialog in the tab and read the phone/email they share with the recruiter, and the profile's
+// Experience section behind it. Returns {email, phone, experience, dialog, rows, diag}, or {block} when LinkedIn stops us.
+// `dialog && rows` means the dialog was really read: its contact rows were up. An empty `email` then means "not shared".
 async function readContactIn(tabId, profileUrl) {
-  const url = Core.contactInfoUrl(profileUrl);
-  if (!url) return { email: '', phone: '' };
+  const none = { email: '', phone: '', experience: null, dialog: false, rows: false, diag: null };
+  // The profile itself, not the dialog's own address: LinkedIn only shows the dialog when "Contact info" is clicked there.
+  const url = Core.normalizeProfileUrl(profileUrl);
+  if (!url) return none;
   try {
     await navigate(tabId, url);
     const landed = await chrome.tabs.get(tabId).catch(() => null);
     if (landed?.url && Core.isLinkedinLoginUrl(landed.url)) return { block: 'not_logged_in' };
-    const res = (await sendToTab(tabId, { type: 'LI_EXTRACT_CONTACT' }, 6, 1000)) || {};
+    const res = (await sendToTab(tabId, { type: 'LI_EXTRACT_CONTACT', open: true }, 6, 1000)) || {};
     if (res.block) return { block: res.block };
-    return { email: res.email || '', phone: res.phone || '' };
+    return {
+      email: res.email || '', phone: res.phone || '', experience: res.experience || null,
+      dialog: !!res.dialog, rows: !!res.rows, diag: res.diag || null,
+    };
   } catch (e) {
     console.warn(LOG, 'contact read failed for', profileUrl, e.message);
-    return { email: '', phone: '' };
+    return { ...none, diag: { error: String(e.message).slice(0, 80) } };
   }
 }
 
-// A candidate is taken only with an email. For every card on this page that could have one (1st-degree connections),
-// open the contact dialog and keep the people it gives an email for. Everyone else is left out, and 2nd/3rd-degree
-// people are never opened. Returns {kept, asked} or {blocked} / {stopped}.
+// A candidate is taken only with an email. For every card on this page that could have one (1st-degree connections), open
+// the contact dialog and keep the people it gives an email for; 2nd/3rd-degree people are never opened. The JD's experience
+// range is applied to what each profile shows.
+//
+// Counts are kept honestly: `readable` is how many dialogs were really read (rows loaded), so "nobody shared an email" is
+// never confused with "the dialogs could not be read". If LinkedIn does not render in a background tab (three unreadable
+// dialogs in a row) the tab is brought to the front once and that person is read again; if dialogs still cannot be read
+// the page is reported as `unreadable`.
 async function collectEmails(job, page, cards) {
+  const plan = job.plan || {};
   const todo = cards.filter((c) => Core.canShareEmail(c));
+  const degrees = { '1st': 0, '2nd': 0, '3rd': 0, '?': 0 };
+  cards.forEach((c) => { const d = String(c.connection_degree || '').slice(0, 3).toLowerCase(); degrees[degrees[d] !== undefined ? d : '?']++; });
+  const stats = { degrees, opened: 0, readable: 0, outOfRange: 0, foregrounded: false, samples: [] };
   const kept = [];
-  if (!todo.length) return { kept, asked: 0 };
+  const streamed = new Set();   // source_links already sent to SkillMate one by one
+  let sentUpTo = 0;
+  // Send each person to SkillMate the moment their email is read, so they show in the table (and are screened) while the rest
+  // of the page is still being read. Anyone whose send fails is simply sent with the page, as before.
+  const flushKept = async () => {
+    while (sentUpTo < kept.length) {
+      const card = kept[sentUpTo++];
+      if (await streamCandidate(job, card)) streamed.add(card.source_link);
+    }
+  };
+  if (!todo.length) return { kept, asked: 0, stats };
   let tab;
   try { tab = await chrome.tabs.create({ url: 'about:blank', active: !!cfg.WORK_TAB_ACTIVE }); }
-  catch (e) { return { kept, asked: 0 }; }
+  catch (e) { return { kept, asked: 0, stats }; }
+
+  // What one dialog tells us: whether it was really read, and the person it gives (if they share an email and fit the range).
+  const consume = (card, found) => {
+    const readable = !!(found.dialog && found.rows);
+    if (readable) stats.readable++;
+    else if (stats.samples.length < 2 && found.diag) stats.samples.push(found.diag);
+    if (found.email) {
+      const exp = found.experience;
+      // The JD's experience range, judged on what the profile's Experience section adds up to.
+      if (cfg.FILTER_BY_EXPERIENCE && !Core.experienceFits(plan.experience_min, plan.experience_max, exp)) { stats.outOfRange++; }
+      else {
+        kept.push({
+          ...card, email: found.email, phone: found.phone || '',
+          ...(exp ? {
+            experience_years: exp.years, total_experience: exp.text, experience_is_lower_bound: exp.lowerBound,
+            experiences: exp.positions.length ? exp.positions : card.experiences,
+          } : {}),
+        });
+      }
+    }
+    return readable;
+  };
+
   let blocked = null;
+  let streak = 0;
+  let unread = [];   // people whose dialog could not be read yet
   try {
     for (let i = 0; i < todo.length; i++) {
       if (!(await isCurrent(job))) return { stopped: true };
       await emit(job, 'contacts', { page, pageTo: job.pageTo, done: i, total: todo.length });
       const found = await readContactIn(tab.id, todo[i].source_link);
       if (found.block) { blocked = found.block; return { blocked }; }
-      if (found.email) kept.push({ ...todo[i], email: found.email, phone: found.phone || '' });
+      stats.opened++;
+      if (consume(todo[i], found)) streak = 0;
+      else { unread.push(i); streak++; }
+      await flushKept();
+
+      if (streak >= 3) {
+        if (stats.foregrounded || cfg.WORK_TAB_ACTIVE) {
+          if (!stats.readable) return { kept, asked: todo.length, stats, unreadable: true, sent: streamed };   // nothing readable even in front
+          streak = 0;
+        } else {
+          // Three unreadable dialogs in a row: LinkedIn may not render in a background tab. Bring the tab to the front once
+          // and read everyone we could not read so far again, so nobody is lost to the first attempts.
+          stats.foregrounded = true;
+          try { await chrome.tabs.update(tab.id, { active: true }); } catch (e) { /* gone */ }
+          const again = unread;
+          unread = [];
+          streak = 0;
+          for (const j of again) {
+            if (!(await sleepAlive(job, randomMs(cfg.PROFILE_PAUSE_SECONDS)))) return { stopped: true };
+            const retry = await readContactIn(tab.id, todo[j].source_link);
+            if (retry.block) { blocked = retry.block; return { blocked }; }
+            if (!consume(todo[j], retry)) { unread.push(j); streak++; }
+            await flushKept();
+          }
+          if (streak >= 3 && !stats.readable) return { kept, asked: todo.length, stats, unreadable: true, sent: streamed };
+        }
+      }
       if (i < todo.length - 1 && !(await sleepAlive(job, randomMs(cfg.PROFILE_PAUSE_SECONDS)))) return { stopped: true };
     }
   } finally {
     if (blocked === 'captcha') { try { await chrome.tabs.update(tab.id, { active: true }); } catch (e) { /* gone */ } }
     else await closeTab(tab.id);   // a CAPTCHA tab stays open and in front: only the recruiter can complete it
   }
-  return { kept, asked: todo.length };
+  const unreadable = todo.length >= 3 && stats.readable === 0;
+  return { kept, asked: todo.length, stats, unreadable, sent: streamed };
+}
+
+// One line for the run record: what the page had and what became of it. Samples of an unread dialog are redacted.
+function describeContacts(page, cardCount, got) {
+  const st = got.stats || {};
+  const d = st.degrees || {};
+  const samples = (st.samples || []).map((x) => (x.sample ? ` sample="${x.sample}"` : '')
+    + ` link=${x.link} clicks=${x.clicks} found=${x.found} rows=${x.rows} via=${x.via || '-'} ${x.visible || ''}${x.error ? ' error=' + x.error : ''}`).join('');
+  return `contacts p${page}: cards=${cardCount} degrees=1st:${d['1st'] || 0}/2nd:${d['2nd'] || 0}/3rd:${d['3rd'] || 0}/?:${d['?'] || 0} `
+    + `asked=${got.asked} opened=${st.opened || 0} readable=${st.readable || 0} emails=${(got.kept || []).length} streamed=${got.sent ? got.sent.size : 0} `
+    + `out-of-range=${st.outOfRange || 0}${st.foregrounded ? ' foregrounded' : ''}${samples}`;
 }
 
 // Set the search step for this run and remember it (so a restarted worker and later pages keep using it).
@@ -367,14 +466,18 @@ async function crawl(job) {
 
     // Take only the people who have an email: ask each one's contact dialog before anything reaches SkillMate.
     let outgoing = profiles;
+    let record = '';
     if (cfg.EMAIL_ONLY) {
       const got = await collectEmails(job, page, profiles);
       if (got.stopped || !(await isCurrent(job))) return;
       if (got.blocked) return failRun(job, got.blocked, `page ${page}, reading contact details`, trail.join(' ; '));
-      outgoing = got.kept;
-      trail.push(`contacts p${page}: cards=${profiles.length} asked=${got.asked} emails=${outgoing.length}`);
+      record = describeContacts(page, profiles.length, got);
+      trail.push(record);
+      // Dialogs that could not be read are not "nobody shared an email": say so, instead of reporting an empty result.
+      if (got.unreadable) return failRun(job, 'contacts_unreadable', '', trail.join(' ; '));
+      outgoing = got.kept.filter((c) => !(got.sent && got.sent.has(c.source_link)));   // the rest went one by one already
     }
-    const outcome = await postPage(job, page, outgoing, ended, res.diag?.url || landed?.url, profiles.length);
+    const outcome = await postPage(job, page, outgoing, ended, res.diag?.url || landed?.url, profiles.length, record);
     if (outcome !== 'next') return;
 
     page += 1;
@@ -422,7 +525,7 @@ async function cancelRun(runId) {
 async function revealContact(p) {
   const out = (ok, reason, candidateError = null) =>
     ({ type: 'LINKEDIN_REVEAL_RESULT', profileId: p.profileId, ok, reason, candidateError });
-  const url = Core.contactInfoUrl(p.sourceLink);
+  const url = Core.normalizeProfileUrl(p.sourceLink);   // the profile: the dialog opens when "Contact info" is clicked there
   if (!url) return out(false, 'bad_link');
   if (await runIsActive()) return out(false, 'busy');   // never read profiles while a search run uses the same session
   if (!(await checkLinkedinLogin())) return out(false, 'not_logged_in');
@@ -435,7 +538,7 @@ async function revealContact(p) {
     await navigate(tab.id, url);
     const landed = await chrome.tabs.get(tab.id).catch(() => null);
     if (landed?.url && Core.isLinkedinLoginUrl(landed.url)) return out(false, 'not_logged_in');
-    const res = (await sendToTab(tab.id, { type: 'LI_EXTRACT_CONTACT' })) || {};
+    const res = (await sendToTab(tab.id, { type: 'LI_EXTRACT_CONTACT', open: true })) || {};
     if (res.block) blocked = res.block; else found = res;
     console.log(LOG, `contact · ${p.name}: phone=${found.phone || '(none)'} email=${found.email || '(none)'} dialog=${found.dialog}`);
   } catch (e) {
