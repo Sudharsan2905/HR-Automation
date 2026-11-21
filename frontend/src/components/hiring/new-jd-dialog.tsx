@@ -46,7 +46,7 @@ export function NewJdDialog({ open, onOpenChange }: { open: boolean; onOpenChang
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!submitting) onOpenChange(o); }}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>New hiring flow</DialogTitle>
           <DialogDescription>
@@ -60,7 +60,14 @@ export function NewJdDialog({ open, onOpenChange }: { open: boolean; onOpenChang
           </div>
           <div className="space-y-2">
             <Label>Job description <span className="text-red-500">*</span></Label>
-            <Textarea value={jdText} onChange={(e) => setJdText(e.target.value)} rows={10} placeholder="Paste the job description here…" />
+            {/* Fixed height with its own scrollbar: the shared Textarea grows with its content, so a long JD would push the dialog
+                off the screen. */}
+            <Textarea
+              value={jdText}
+              onChange={(e) => setJdText(e.target.value)}
+              placeholder="Paste the job description here…"
+              className="field-sizing-fixed h-64 max-h-[45vh] resize-y overflow-y-auto"
+            />
             <div className="flex items-center gap-2">
               <input
                 ref={fileRef}
