@@ -474,15 +474,17 @@ async def _expire_stale_runs(jd_id: str) -> None:
             await _touch(run)
 
 
-async def _shortlist_from_pool(jd_id: str, run_id: str, limit: int | None = None) -> int:
+async def _shortlist_from_pool(jd_id: str, run_id: str, limit: int | None = None, source: str | None = None) -> int:
+    """Shortlist the best screened people waiting in the pool. With `source` (a profile label, "Naukri" / "LinkedIn") only
+    that source's people are taken: a run that reads one site must not fill its places with the other site's people, or
+    the second source of a two-source click would add nothing."""
     limit = settings.SOURCING_BATCH_SIZE if limit is None else limit
     if limit <= 0:
         return 0
-    best = await SourcedProfile.find(
-        SourcedProfile.sourcing_jd_id == jd_id,
-        SourcedProfile.status == "pool",
-        NE(SourcedProfile.score, None),
-    ).sort(-SourcedProfile.score).limit(limit).to_list()
+    criteria = [SourcedProfile.sourcing_jd_id == jd_id, SourcedProfile.status == "pool", NE(SourcedProfile.score, None)]
+    if source:
+        criteria.append(SourcedProfile.source == source)
+    best = await SourcedProfile.find(*criteria).sort(-SourcedProfile.score).limit(limit).to_list()
     for p in best:
         p.status = "shortlisted"
         p.shortlisted_in_run_id = run_id
@@ -501,9 +503,11 @@ def _unscored_pool(jd_id: str, *extra):
     )
 
 
-async def start_run(jd_id: str, user: User, background_tasks: BackgroundTasks, source: str = "naukri") -> dict:
+async def start_run(jd_id: str, user: User, background_tasks: BackgroundTasks, source: str = "naukri",
+                    use_pool: bool = True) -> dict:
     """One "Source candidates" click. Screened matches already in the pool are served first whatever the
-    source; only a run that must read a site names its source ("naukri" or "linkedin")."""
+    source; only a run that must read a site names its source ("naukri" or "linkedin"). With `use_pool=False` the
+    pool is skipped and the site is read (a click that checks both sources reads the second one this way)."""
     if source not in SOURCES:
         raise HTTPException(400, f"Unknown source: {source}")
     jd = await _get_owned(jd_id, user, write=True)
@@ -514,7 +518,7 @@ async def start_run(jd_id: str, user: User, background_tasks: BackgroundTasks, s
         raise HTTPException(409, "A sourcing run is already in progress")
 
     run_no = await SourcingRun.find(SourcingRun.sourcing_jd_id == jd_id).count() + 1
-    pool_ready = await SourcedProfile.find(
+    pool_ready = 0 if not use_pool else await SourcedProfile.find(
         SourcedProfile.sourcing_jd_id == jd_id, SourcedProfile.status == "pool", NE(SourcedProfile.score, None),
     ).count()
 
@@ -530,7 +534,7 @@ async def start_run(jd_id: str, user: User, background_tasks: BackgroundTasks, s
         return {"run": _run_out(run), "mode": "pool"}
 
     # 2. Profiles read earlier but not screened yet: screen those before opening ResDex.
-    if await _unscored_pool(jd_id).count():
+    if use_pool and await _unscored_pool(jd_id).count():
         run = SourcingRun(sourcing_jd_id=jd_id, run_no=run_no, clicked_by=str(user.id), mode="pool",
                           status="screening", source=source, updated_at=_now())
         await run.insert()
@@ -730,7 +734,7 @@ async def process_page(run_id: str) -> None:
 
         if run.phase == "hunting":
             run.profiles_shortlisted += await _shortlist_from_pool(
-                jd_id, run_id, settings.SOURCING_BATCH_SIZE - run.profiles_shortlisted)
+                jd_id, run_id, settings.SOURCING_BATCH_SIZE - run.profiles_shortlisted, source=cfg.label)
             if run.profiles_shortlisted >= settings.SOURCING_BATCH_SIZE:
                 run.phase = "prefetch"
                 run.prefetch_left = cfg.prefetch_pages
@@ -893,6 +897,23 @@ async def _owner_name(p: SourcedProfile, user: User) -> str | None:
     return (owner.full_name or owner.email) if owner else cand.created_by
 
 
+async def _retire_duplicates(p: SourcedProfile) -> None:
+    """The same person can be found on Naukri and on LinkedIn. When one copy is selected, the other copies that are still
+    undecided (same email, same JD) are rejected as duplicates, so only one is kept; the invite already goes out once."""
+    if not p.email:
+        return
+    others = await SourcedProfile.find(
+        SourcedProfile.sourcing_jd_id == p.sourcing_jd_id, SourcedProfile.email == p.email,
+        NE(SourcedProfile.id, p.id), In(SourcedProfile.status, ["pool", "shortlisted", "on_hold", "below_threshold"]),
+    ).to_list()
+    for other in others:
+        other.status = "rejected"
+        other.status_history.append(StatusEvent(
+            status="rejected", by="system", note=f"Duplicate: same email as {p.name} ({p.source}), who was selected"))
+        other.updated_at = _now()
+        await other.save()
+
+
 async def _promote(p: SourcedProfile, user: User) -> str | None:
     """Create (or link) the SkillMate candidate for a selected profile. Returns an error message or None."""
     from app.components.auth.schemas import CandidateLinkRequest
@@ -911,6 +932,10 @@ async def _promote(p: SourcedProfile, user: User) -> str | None:
         await on_profile_promoted(p)
     except Exception as e:  # the hiring flow must never break profile selection
         log.error("Hiring hook failed for profile %s: %s", p.id, e, exc_info=True)
+    try:
+        await _retire_duplicates(p)
+    except Exception as e:  # tidying duplicates must never break profile selection either
+        log.error("Duplicate clean-up failed for profile %s: %s", p.id, e, exc_info=True)
     return None
 
 

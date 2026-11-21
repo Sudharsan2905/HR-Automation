@@ -65,7 +65,8 @@ async def start_run(jd_id: str, background_tasks: BackgroundTasks, body: StartRu
                     user: User = Depends(get_effective_user)):
     """Source candidates: serve from the pool (screening leftovers first), or start a page-by-page scrape run
     on `source` ("naukri" by default, or "linkedin")."""
-    return await service.start_run(jd_id, user, background_tasks, source=body.source if body else "naukri")
+    return await service.start_run(jd_id, user, background_tasks, source=body.source if body else "naukri",
+                                   use_pool=body.use_pool if body else True)
 
 
 @router.get("/runs/{run_id}")

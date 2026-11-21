@@ -105,6 +105,9 @@ class ProfilesIn(BaseModel):
 
 class StartRunIn(BaseModel):
     source: Literal["naukri", "linkedin"] = "naukri"
+    # False = read this source's site now, even if matches are waiting in the pool. Used when one click checks both sources:
+    # the second source must actually be read, not answered from what the first one left in the pool.
+    use_pool: bool = True
 
 
 class RunFailIn(BaseModel):

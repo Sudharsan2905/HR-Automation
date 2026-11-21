@@ -44,8 +44,9 @@ export const updateSearchPlan = (id: string, plan: SourcingSearchPlan) =>
 export const deleteSourcingJd = (id: string) =>
   apiClient.delete<unknown, { message: string }>(`/sourcing/jds/${id}`);
 
-export const startRun = (id: string, source: SourceKey = "naukri") =>
-  apiClient.post<unknown, RunStartResult>(`/sourcing/jds/${id}/runs`, { source });
+/** `usePool: false` reads the source's own site even when matches are waiting (used for the second source of a click). */
+export const startRun = (id: string, source: SourceKey = "naukri", usePool = true) =>
+  apiClient.post<unknown, RunStartResult>(`/sourcing/jds/${id}/runs`, usePool ? { source } : { source, use_pool: false });
 
 export const getRun = (runId: string) =>
   apiClient.get<unknown, SourcingRun>(`/sourcing/runs/${runId}`);

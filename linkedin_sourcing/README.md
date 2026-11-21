@@ -15,12 +15,21 @@ used (see below).
 3. Reload any open SkillMate and LinkedIn tabs.
 
 ## How SkillMate uses it
-On **Hiring → a JD → Source candidates**, SkillMate tries **Naukri first**. LinkedIn is used when:
-- the Naukri extension isn't installed, or ResDex isn't logged in; or
-- a Naukri run fails (CAPTCHA, search form not found, no results, …), and LinkedIn is installed and logged in.
+On **Hiring → a JD → Source candidates**, SkillMate uses **both** sources when it can:
 
-When LinkedIn takes over you see "Naukri failed — switching to LinkedIn". Screened matches already waiting in
-the pool are served first, whatever the source.
+1. **Naukri first.** It reads ResDex (or serves matches it had already found) and shortlists up to 5.
+2. **Then LinkedIn, in the same click.** When the Naukri run finishes, SkillMate says "Naukri is done. Checking LinkedIn too…"
+   and starts a LinkedIn run that **reads LinkedIn's own site** (it is not answered from what Naukri left in the pool) and
+   shortlists up to 5 of **LinkedIn's own** people. So one click can add up to 5 from each source.
+3. **LinkedIn is skipped, with a note,** when its extension isn't installed or logged in, or LinkedIn has no more results for
+   the search. Naukri-only and LinkedIn-only use work exactly as before.
+
+LinkedIn also takes over when Naukri can't be used: the Naukri extension isn't installed, ResDex isn't logged in or has no more
+results, or a Naukri run fails (CAPTCHA, form not found, nothing found). Then you see "Naukri failed — switching to LinkedIn".
+
+**One copy of a person.** The same person can appear on both. If an email is already known for both, the second copy is dropped
+on arrival; otherwise, when you select one copy, the other undecided copies with the same email are rejected as
+"Duplicate: same email as …" (visible under Rejected), and the invite goes out once either way.
 
 ## What a run does
 1. Checks the LinkedIn login (your open LinkedIn tab, otherwise a background tab on the feed). No profile is opened.

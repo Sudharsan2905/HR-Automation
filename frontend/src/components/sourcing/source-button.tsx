@@ -77,6 +77,7 @@ export function SourceButton({ jd, ext, li, onChanged }: { jd: SourcingJdDetail;
   const handled = useRef<string | null>(null);   // run whose extension error was already reported
   const closed = useRef<string | null>(null);    // run whose end was already processed
   const fellBack = useRef(false);                // this click already switched from Naukri to LinkedIn once
+  const linkedinStarted = useRef(false);         // this click already started a LinkedIn run (so it is checked only once)
   const shownShortlisted = useRef(0);
 
   // The poll below outlives a render; give it the latest props.
@@ -86,9 +87,9 @@ export function SourceButton({ jd, ext, li, onChanged }: { jd: SourcingJdDetail;
   const progress = runId ? (activeSource === "linkedin" ? li.progress[runId] : ext.progress[runId]) : undefined;
 
   // Start a run on `source` (or serve what is already waiting in SkillMate).
-  const begin = async (source: SourceKey) => {
+  const begin = async (source: SourceKey, opts?: { usePool?: boolean }) => {
     const { jd: cur, ext: naukri, li: linkedin } = latest.current;
-    const res = await startRun(cur.id, source);
+    const res = await startRun(cur.id, source, opts?.usePool ?? true);
     if (res.mode === "pool" && res.run.status === "done") {
       toast.success(`Added ${res.run.profiles_shortlisted} from earlier results`);
       setBusy(false);
@@ -131,6 +132,28 @@ export function SourceButton({ jd, ext, li, onChanged }: { jd: SourcingJdDetail;
     else if (naukriLogin || liLogin) toast.error("The sourcing extension didn't respond. Reload this page and try again.");
     else return ready(naukri) ? "naukri" : "linkedin";  // both exhausted: SkillMate serves leftovers or says so
     return null;
+  };
+
+  // Naukri worked (it read ResDex, or served matches it had already found): check LinkedIn too, in the same click. LinkedIn
+  // reads its own site (usePool: false: it must not just be handed what Naukri left behind) and adds its own people, up to the
+  // same number. It is skipped, with a note, when LinkedIn isn't ready; nothing else changes for Naukri-only or LinkedIn-only use.
+  const chainLinkedin = async (finished: SourcingRun): Promise<boolean> => {
+    const { jd: cur, li: linkedin } = latest.current;
+    if (finished.source !== "naukri" || linkedinStarted.current) return false;
+    if (!liReady(linkedin) || cur.linkedin_exhausted) return false;
+    linkedinStarted.current = true;
+    try {
+      if ((await linkedin.checkLogin()) !== "ok") {
+        toast.info("Naukri is done. LinkedIn isn't logged in, so it was skipped this time.");
+        return false;
+      }
+      toast.info("Naukri is done. Checking LinkedIn too…");
+      await begin("linkedin", { usePool: false });
+      return true;
+    } catch (err: unknown) {
+      toast.error((err as { message?: string })?.message || "Could not start the LinkedIn check");
+      return false;
+    }
   };
 
   // A Naukri run that failed (CAPTCHA, form not found, no results, not logged in…): carry on with LinkedIn.
@@ -186,6 +209,7 @@ export function SourceButton({ jd, ext, li, onChanged }: { jd: SourcingJdDetail;
           setRunId(null);
           onChanged();
           if (current.status === "failed" && await fallBackToLinkedin(current)) return;  // still busy: a new run started
+          if (current.status === "done" && await chainLinkedin(current)) return;          // Naukri worked: LinkedIn runs next
           if (current.status === "failed" && (current.error || "").startsWith("not_logged_in")) setLoginOpen(current.source);
           setBusy(false);
         }
@@ -209,6 +233,7 @@ export function SourceButton({ jd, ext, li, onChanged }: { jd: SourcingJdDetail;
   const click = async () => {
     setBusy(true);
     fellBack.current = false;
+    linkedinStarted.current = false;
     try {
       // Matches already waiting in SkillMate are served without opening any site.
       const source = jd.pool_count > 0 ? "naukri" : await pickSource();
