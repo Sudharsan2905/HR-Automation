@@ -16,6 +16,11 @@
     SKILLMATE_API_ORIGINS: ['http://localhost:3000', 'http://localhost:8000'],
     // Opened in a background tab to check the LinkedIn login. Opens no profile.
     LINKEDIN_HOME_URL: 'https://www.linkedin.com/feed/',
+    // Take a LinkedIn candidate only if they have an email. LinkedIn cards never show one, so each candidate's
+    // contact dialog is opened and only the people whose dialog gives an email are sent to SkillMate. LinkedIn shares
+    // an email only with 1st-degree connections, so the search is limited to them and 2nd/3rd-degree people are
+    // skipped without opening their profile. Set false to send every card instead (emails are then read at Select).
+    EMAIL_ONLY: true,
     // Open the working tab in the foreground. Leave false normally; set true if LinkedIn shows empty cards because
     // it doesn't finish rendering in a background tab (the tab then takes focus for each run and contact read).
     WORK_TAB_ACTIVE: false,

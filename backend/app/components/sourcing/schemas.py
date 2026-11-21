@@ -90,6 +90,9 @@ class ProfilesIn(BaseModel):
     pages_crawled: int | None = None    # ignored (older extension builds); SkillMate counts pages
     source_url: str = ""                # the results page the extension scraped
     search_level: int | None = Field(None, ge=0, le=20)   # LinkedIn: the search step these pages came from
+    # LinkedIn: how many people the page showed. Only those with an email are sent in `profiles`; this keeps the
+    # page counted (and the run moving on) when nobody on it had one.
+    scanned: int | None = Field(None, ge=0, le=1000)
 
 
 class StartRunIn(BaseModel):

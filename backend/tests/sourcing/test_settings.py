@@ -16,6 +16,6 @@ def test_sourcing_settings_defaults():
 
 def test_linkedin_is_read_more_gently_than_naukri():
     assert settings.SOURCING_LINKEDIN_PAGES_PER_RUN == 4
-    assert settings.SOURCING_LINKEDIN_PREFETCH_PAGES == 1
+    assert settings.SOURCING_LINKEDIN_PREFETCH_PAGES == 0   # no spare pages: each LinkedIn candidate costs a contact view
     assert settings.SOURCING_LINKEDIN_MAX_PAGE == 20
     assert settings.SOURCING_LINKEDIN_PAGES_PER_RUN <= settings.SOURCING_PAGES_PER_RUN

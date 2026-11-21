@@ -250,6 +250,7 @@ export function ProfilesTable({ profiles, counts, runs, ext, li, onChanged }: {
                     <ExternalLink className="h-3 w-3" />
                   </a>
                   <Badge variant="secondary" className="ml-2 text-[10px]">{p.source || "Naukri"}</Badge>
+                  {p.email && <p className="text-xs font-normal text-muted-foreground">{p.email}</p>}
                   {p.status !== tab && <Badge variant="outline" className="ml-2 text-[10px] capitalize">{p.status.replace("_", " ")}</Badge>}
                 </TableCell>
                 <TableCell className="text-sm">{[p.current_title, p.current_company].filter(Boolean).join(" @ ") || p.headline || "—"}</TableCell>

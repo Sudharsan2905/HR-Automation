@@ -47,6 +47,8 @@ export interface SourcingRun {
   next_action: "next_page" | null;
   source_url: string;
   profiles_received: number;
+  /** LinkedIn: people looked at. Only those with a shared email are kept (profiles_received). */
+  profiles_scanned: number;
   profiles_new: number;
   profiles_shortlisted: number;
   created_at: string;

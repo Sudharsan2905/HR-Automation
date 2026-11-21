@@ -33,7 +33,7 @@ def card(i: int, **kw) -> dict:
     data = {
         "name": f"Li {i}", "headline": "Python Developer | Django", "snippet": "Summary: built Django apps",
         "location": "Chennai, Tamil Nadu, India", "source": "LinkedIn",
-        "source_link": f"https://www.linkedin.com/in/li-{i}", "email": "", "phone": "",
+        "source_link": f"https://www.linkedin.com/in/li-{i}", "email": f"li{i}@example.com", "phone": "",
         "skills": ["Python"], "experiences": [{"company": "Zoho", "title": "Developer", "duration": "",
                                                "is_current": True, "starts_at": {}, "ends_at": {}}],
         "education": [], "total_experience": "", "current_ctc": "", "connection_degree": "2nd",

@@ -115,12 +115,18 @@ async def _auto_select(jd: SourcingJd, jd_id: str) -> None:
     shortlisted = await SourcedProfile.find(
         SourcedProfile.sourcing_jd_id == jd_id, SourcedProfile.status == "shortlisted"
     ).to_list()
+    # Every shortlisted LinkedIn candidate has an email (that is how they got in), so auto-selecting them would send an
+    # exam invite to each one the moment a run ends. They wait for the recruiter's own Select.
+    held = [x for x in shortlisted if x.email and x.source == "LinkedIn" and not settings.HIRING_AUTO_SELECT_LINKEDIN]
+    held_ids = {str(x.id) for x in held}
     _batching.add(jd_id)
     try:
-        for p in (x for x in shortlisted if x.email):
+        for p in (x for x in shortlisted if x.email and str(x.id) not in held_ids):
             await sourcing_service.set_status(str(p.id), "selected", "Auto-selected by the hiring flow", owner)
     finally:
         _batching.discard(jd_id)
+    if held:
+        await log_event(jd_id, "sourcing", f"{len(held)} LinkedIn candidate(s) have an email and wait for your Select before any invite is sent")
     need_contact = sum(1 for x in shortlisted if not x.email)
     if need_contact:
         await log_event(jd_id, "sourcing", f"{need_contact} shortlisted profile(s) need a contact reveal before Level 1 can be sent", "warn")

@@ -84,6 +84,7 @@ class SourcingRun(Document):
     results_ended: bool = False
     source_url: str = ""
     profiles_received: int = 0
+    profiles_scanned: int = 0   # LinkedIn: people looked at; only the ones with an email are kept (profiles_received)
     profiles_new: int = 0
     profiles_shortlisted: int = 0
     status: str = "pending"  # pending | scraping | screening | done | failed | cancelled

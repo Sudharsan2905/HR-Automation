@@ -192,13 +192,23 @@
     return levels[Math.min(Math.max(0, Math.round(Number(level) || 0)), levels.length - 1)];
   }
 
-  // People-search results page n. Paging by URL is how LinkedIn's own pager works.
-  function buildSearchUrl(plan, page, level) {
+  // People-search results page n. Paging by URL is how LinkedIn's own pager works. With `firstDegreeOnly` the search
+  // is limited to the recruiter's 1st-degree connections (LinkedIn's "Connections: 1st" filter): the only people who
+  // share an email.
+  function buildSearchUrl(plan, page, level, opts) {
     const q = buildSearchQuery(plan, level);
     if (!q) return '';
     const n = Math.max(1, Math.round(Number(page) || 1));
+    const network = opts && opts.firstDegreeOnly ? '&network=' + encodeURIComponent('["F"]') : '';
     return 'https://www.linkedin.com/search/results/people/?keywords=' + encodeURIComponent(q)
-      + '&origin=GLOBAL_SEARCH_HEADER&page=' + n;
+      + '&origin=GLOBAL_SEARCH_HEADER' + network + '&page=' + n;
+  }
+
+  // Is it worth opening this person's contact dialog? LinkedIn shows a phone/email only for 1st-degree connections, so
+  // a card that says 2nd or 3rd is skipped. A card with no degree (markup changed) is tried rather than lost.
+  function canShareEmail(profile) {
+    const degree = String((profile && profile.connection_degree) || '').toLowerCase();
+    return !(degree.startsWith('2') || degree.startsWith('3'));
   }
 
   // https://www.linkedin.com/in/<slug> — no query string, fragment, trailing slash or sub-page; '' if not a profile.
@@ -351,6 +361,7 @@
     switch (stage) {
       case 'searching': return 'Searching LinkedIn for this JD…';
       case 'scraping': return page ? `Reading LinkedIn page ${page}…` : 'Reading LinkedIn results…';
+      case 'contacts': return page ? `Checking contact details on page ${page}…` : 'Checking contact details…';
       case 'screening': return page ? `SkillMate is screening page ${page}…` : 'SkillMate is screening…';
       case 'done': return 'Done — matches are in SkillMate';
       case 'error': return ERROR_TEXT[reason] || `Stopped: ${reason || 'unknown error'}`;
@@ -379,7 +390,7 @@
     PAGE_SOURCE, EXT_SOURCE, REQUEST_TYPES,
     isAllowedOrigin, isPageRequest, isAllowedApiBase, apiUrl,
     isLinkedinLoginUrl, isLinkedinCheckpointUrl, classifyBlock, isNoResultsText,
-    searchKeywords, splitTopLevel, isSoftGroup, searchLevels, buildSearchQuery, buildSearchUrl, normalizeProfileUrl, contactInfoUrl,
+    canShareEmail, searchKeywords, splitTopLevel, isSoftGroup, searchLevels, buildSearchQuery, buildSearchUrl, normalizeProfileUrl, contactInfoUrl,
     parseResultLines, splitRoleCompany, validEmail, validPhone, parseContactOverlay,
     stageLabel, pickLinkedinTab, hasVisibleLoginForm,
   };

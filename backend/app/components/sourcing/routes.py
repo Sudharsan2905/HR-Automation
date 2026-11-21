@@ -72,7 +72,7 @@ async def receive_profiles(run_id: str, body: ProfilesIn, background_tasks: Back
     """The extension posts one results page (ResDex or LinkedIn); screening runs in the background, then the
     run asks for the next page (next_action="next_page") or finishes."""
     return await service.receive_profiles(run_id, body.profiles, user, background_tasks, ended=body.ended,
-                                          source_url=body.source_url, search_level=body.search_level)
+                                          source_url=body.source_url, search_level=body.search_level, scanned=body.scanned)
 
 
 @router.post("/runs/{run_id}/fail")

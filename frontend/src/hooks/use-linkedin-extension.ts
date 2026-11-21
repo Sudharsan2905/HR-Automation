@@ -10,9 +10,10 @@ import type { SourcingSearchPlan } from "@/types/sourcing";
 // content script relays between this page and its background worker.
 
 // The oldest extension build this page works with. 1.1.0 added the search ladder (broaden the search when LinkedIn
-// finds nobody) and the `search_level` handshake. Chrome does NOT reload an unpacked extension when its files change,
-// so after an update the old code keeps running until it is reloaded at chrome://extensions: refuse to use it.
-export const LINKEDIN_EXTENSION_MIN_VERSION = "1.1.0";
+// finds nobody); 1.2.0 takes a candidate only with an email (it opens each contact dialog), which SkillMate now insists
+// on: an older build would send people without one and get nothing in. Chrome does NOT reload an unpacked extension when
+// its files change, so after an update the old code keeps running until it is reloaded at chrome://extensions: refuse it.
+export const LINKEDIN_EXTENSION_MIN_VERSION = "1.2.0";
 
 /** -1 / 0 / 1 like a comparator, for dotted numeric versions ("1.10.0" > "1.9.0"). */
 export function compareVersions(a: string, b: string): number {
@@ -28,12 +29,15 @@ export function compareVersions(a: string, b: string): number {
 const PAGE = "skillmate-li-page";
 const EXT = "skillmate-li-ext";
 
-export type LinkedinStage = "searching" | "scraping" | "screening" | "done" | "error";
+export type LinkedinStage = "searching" | "scraping" | "contacts" | "screening" | "done" | "error";
 export interface LinkedinProgress {
   stage: LinkedinStage;
   page?: number;
   pageTo?: number;
   reason?: string;
+  /** stage "contacts": contact dialogs read so far / to read on this page */
+  done?: number;
+  total?: number;
 }
 
 interface ExtMessage {
@@ -78,8 +82,8 @@ export function useLinkedinExtension() {
       }
 
       if (data.type === "LINKEDIN_PROGRESS" && typeof data.runId === "string") {
-        const { stage, page, pageTo, reason } = data as unknown as LinkedinProgress & { runId: string };
-        setProgress((prev) => ({ ...prev, [data.runId as string]: { stage, page, pageTo, reason } }));
+        const { stage, page, pageTo, reason, done, total } = data as unknown as LinkedinProgress & { runId: string };
+        setProgress((prev) => ({ ...prev, [data.runId as string]: { stage, page, pageTo, reason, done, total } }));
       }
 
       if (data.requestId && pending.current.has(data.requestId)) {

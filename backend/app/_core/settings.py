@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     SOURCING_RUN_TIMEOUT_MINUTES: int = 20
     # LinkedIn is read more gently than ResDex: its pages hold ~10 people, and fewer pages are read per click.
     SOURCING_LINKEDIN_PAGES_PER_RUN: int = 4
-    SOURCING_LINKEDIN_PREFETCH_PAGES: int = 1
+    SOURCING_LINKEDIN_PREFETCH_PAGES: int = 0   # no spare pages: every LinkedIn candidate costs a contact-dialog view
     SOURCING_LINKEDIN_MAX_PAGE: int = 20
 
     # Level 1 (AI-generated proctored exam)
@@ -66,6 +66,9 @@ class Settings(BaseSettings):
     LEVEL1_MAX_REACCESS: int = 3            # admin re-access grants per candidate
     LEVEL1_HOLD_DELAY_SECONDS: int = 60     # websocket silence before the session goes ON_HOLD
     HIRING_AUTO_SELECT: bool = True         # shortlisted profiles are selected automatically
+    # LinkedIn candidates are shortlisted only when they have an email, so auto-select would invite every one of them
+    # the moment a run ends. Keep them for the recruiter's own Select unless this is switched on.
+    HIRING_AUTO_SELECT_LINKEDIN: bool = False
 
     # App
     APP_NAME: str = "SkillMate"

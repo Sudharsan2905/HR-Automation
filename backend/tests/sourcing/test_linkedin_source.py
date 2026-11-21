@@ -25,7 +25,7 @@ def patch_llm(monkeypatch, fake_llm):
 
 def li(i: int, **kw) -> ScrapedProfileIn:
     data = dict(name=f"Li {i}", source_link=f"https://www.linkedin.com/in/li-{i}/?miniProfileUrn=urn%3Ali%3A{i}",
-                headline="Python developer", snippet="Skills: Python, Django",
+                headline="Python developer", snippet="Skills: Python, Django", email=f"li{i}@example.com",
                 experiences=[{"company": f"Co{i}", "title": "Dev", "is_current": True}])
     data.update(kw)
     return ScrapedProfileIn(**data)
@@ -126,7 +126,7 @@ async def test_a_person_already_found_by_email_on_naukri_is_not_added_again_from
     run_id = (await _run(jd, user, "linkedin"))["run"]["id"]
     out = await service.receive_profiles(
         run_id, [li(1, name="Asha K", email="ASHA@mail.com"), li(2)], user, BackgroundTasks())
-    assert out == {"accepted": 1, "duplicates": 1}
+    assert out == {"accepted": 1, "duplicates": 1, "no_email": 0}
     names = {p.name for p in await SourcedProfile.find(SourcedProfile.sourcing_jd_id == str(jd.id)).to_list()}
     assert names == {"Asha", "Li 2"}
 

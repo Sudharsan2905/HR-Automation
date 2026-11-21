@@ -31,7 +31,7 @@ const LINKEDIN_ERRORS: Record<string, string> = {
   skillmate_auth: "Your SkillMate session expired. Refresh this page and try again.",
   search_failed: "LinkedIn didn't show search results. Check the LinkedIn tab and try again.",
   extension_reloaded: "The SkillMate LinkedIn extension was updated — reload this page to reconnect it.",
-  no_results: "LinkedIn found no people for this JD, even after SkillMate broadened the search step by step. Check the keywords in the search plan, or re-analyze the JD.",
+  no_results: "LinkedIn found none of your connections for this JD, even after SkillMate broadened the search step by step. Only 1st-degree connections can be taken (they are the ones who share an email). Check the keywords in the search plan, or re-analyze the JD.",
 };
 
 const RELOAD_TEXT = "A SkillMate sourcing extension was updated — reload this page to reconnect it.";
@@ -169,9 +169,14 @@ export function SourceButton({ jd, ext, li, onChanged }: { jd: SourcingJdDetail;
           onChanged();
         }
         if (current.status === "done") {
-          toast.success(current.profiles_shortlisted
-            ? `Added ${current.profiles_shortlisted} new match${current.profiles_shortlisted > 1 ? "es" : ""}`
-            : "No new matches this time");
+          if (current.profiles_shortlisted) {
+            toast.success(`Added ${current.profiles_shortlisted} new match${current.profiles_shortlisted > 1 ? "es" : ""}`);
+          } else if (current.source === "linkedin" && current.profiles_scanned > 0) {
+            // LinkedIn candidates are taken only with an email: say why a run that read people added none.
+            toast.info(`No new matches: ${current.profiles_scanned} LinkedIn connection${current.profiles_scanned > 1 ? "s were" : " was"} checked, ${current.profiles_received} shared an email and none passed the screening.`);
+          } else {
+            toast.success("No new matches this time");
+          }
         }
         if (["done", "failed", "cancelled"].includes(current.status)) {
           closed.current = runId;
@@ -229,6 +234,8 @@ export function SourceButton({ jd, ext, li, onChanged }: { jd: SourcingJdDetail;
     : run?.phase === "prefetch" ? `5 found — reading ${activeSource === "linkedin" ? "an extra page" : "2 more pages"} for next time…`
     : !progress ? "Starting…"
     : progress.stage === "searching" ? `Searching ${site}…`
+    : progress.stage === "contacts"
+      ? `Checking contact details${progress.total ? ` ${progress.done ?? 0} of ${progress.total}` : ""} (page ${progress.page ?? "…"})… ${tally}`
     : progress.stage === "scraping" ? `Reading ${site} page ${progress.page ?? "…"}… ${tally}`
     : progress.stage === "screening" ? `Screening page ${progress.page ?? "…"}… ${tally}`
     : progress.stage === "done" ? "Finishing…"

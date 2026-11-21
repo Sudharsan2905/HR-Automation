@@ -254,3 +254,29 @@ test('the url follows the chosen step and clamps out-of-range steps', () => {
   assert.equal(kw(undefined), kw(0));
   assert.equal(new URL(C.buildSearchUrl(FULL_STACK_PLAN, 2, 1)).searchParams.get('page'), '2');
 });
+
+// -- candidates are taken only with an email ---------------------------------------------------------------------------
+
+test('the search can be limited to 1st-degree connections, the only people who share an email', () => {
+  const plan = { primary_keywords: 'Python AND Django' };
+  const limited = new URL(C.buildSearchUrl(plan, 2, 0, { firstDegreeOnly: true }));
+  assert.equal(limited.searchParams.get('network'), '["F"]');
+  assert.equal(limited.searchParams.get('page'), '2');
+  assert.equal(limited.searchParams.get('keywords'), 'Python AND Django');
+  assert.equal(new URL(C.buildSearchUrl(plan, 2, 0)).searchParams.has('network'), false);
+  assert.equal(new URL(C.buildSearchUrl(plan, 2, 0, { firstDegreeOnly: false })).searchParams.has('network'), false);
+});
+
+test('only people who could share an email are worth opening', () => {
+  assert.equal(C.canShareEmail({ connection_degree: '1st' }), true);
+  assert.equal(C.canShareEmail({ connection_degree: '2nd' }), false);
+  assert.equal(C.canShareEmail({ connection_degree: '3rd+' }), false);
+  assert.equal(C.canShareEmail({ connection_degree: '' }), true);        // unknown: try rather than lose them
+  assert.equal(C.canShareEmail({}), true);
+  assert.equal(C.canShareEmail(null), true);
+});
+
+test('progress text while contact details are read', () => {
+  assert.equal(C.stageLabel('contacts', 2), 'Checking contact details on page 2\u2026');
+  assert.equal(C.stageLabel('contacts'), 'Checking contact details\u2026');
+});

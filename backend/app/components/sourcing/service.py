@@ -178,6 +178,7 @@ def _run_out(run: SourcingRun) -> dict:
         "pages_from": run.pages_from, "pages_to": run.pages_to, "pages_crawled": run.pages_crawled,
         "phase": run.phase, "next_action": run.next_action,
         "source_url": run.source_url, "profiles_received": run.profiles_received,
+        "profiles_scanned": run.profiles_scanned,
         "profiles_new": run.profiles_new, "profiles_shortlisted": run.profiles_shortlisted,
         "created_at": run.created_at, "finished_at": run.finished_at,
     }
@@ -529,18 +530,23 @@ def _current_role(experiences: list[dict]) -> tuple[str, str]:
 
 async def receive_profiles(run_id: str, profiles: list[ScrapedProfileIn], user: User,
                            background_tasks: BackgroundTasks, *, ended: bool = False,
-                           source_url: str = "", search_level: int | None = None) -> dict:
+                           source_url: str = "", search_level: int | None = None,
+                           scanned: int | None = None) -> dict:
     """One results page from an extension. Screening runs in the background.
 
     A person is stored once per JD: by profile link and, when the page already shows an email, by email too,
-    so the same person found on Naukri and on LinkedIn is not screened (or emailed) twice."""
+    so the same person found on Naukri and on LinkedIn is not screened (or emailed) twice.
+
+    A LinkedIn candidate is only taken with an email: the extension sends just the people whose contact dialog gave
+    one, and anyone without is refused here too, whatever sent them."""
     run, jd = await _get_owned_run(run_id, user, write=True)
     if run.mode != "scrape" or run.status not in ("pending", "scraping") or run.next_action != "next_page":
         raise HTTPException(409, "This run is not waiting for a page")
     run.status = "screening"
     run.next_action = None
     run.profiles_received += len(profiles)
-    if profiles:
+    run.profiles_scanned += scanned if scanned is not None else len(profiles)
+    if profiles or scanned:  # a LinkedIn page nobody on it shared an email for is still a page that was read
         run.pages_crawled = (run.pages_crawled or 0) + 1
     run.results_ended = ended
     if source_url:
@@ -557,12 +563,17 @@ async def receive_profiles(run_id: str, profiles: list[ScrapedProfileIn], user: 
     known = await SourcedProfile.find(SourcedProfile.sourcing_jd_id == jd_id).to_list()
     existing = {p.source_link for p in known}
     existing_emails = {p.email.lower() for p in known if p.email}
+    require_email = run.source == "linkedin"
     inserted = 0
     duplicates = 0
+    no_email = 0
     for sp in profiles:
         link = _normalize_link(sp.source_link, run.source)
         email = (sp.email or "").strip().lower()
         if not link or link in existing:
+            continue
+        if require_email and "@" not in email:
+            no_email += 1
             continue
         if email and email in existing_emails:
             duplicates += 1  # already found (maybe on the other source): keep the first copy only
@@ -586,7 +597,7 @@ async def receive_profiles(run_id: str, profiles: list[ScrapedProfileIn], user: 
     run.profiles_new += inserted
     await _touch(run)
     background_tasks.add_task(process_page, run_id)
-    return {"accepted": inserted, "duplicates": duplicates}
+    return {"accepted": inserted, "duplicates": duplicates, "no_email": no_email}
 
 
 async def _finish(run: SourcingRun, status: str, error: str | None = None) -> None:
@@ -642,7 +653,7 @@ async def process_page(run_id: str) -> None:
         jd.updated_at = _now()
         await jd.save()
 
-        last_page_was_empty = crawled == 0 or run.profiles_received == 0
+        last_page_was_empty = crawled == 0 or (run.profiles_received == 0 and run.profiles_scanned == 0)
         more = (
             not _is_exhausted(jd, run.source)
             and not last_page_was_empty

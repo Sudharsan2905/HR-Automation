@@ -230,11 +230,12 @@ async function finishRun(job, run) {
 }
 
 // One results page to SkillMate; wait while it is screened. Returns 'next' | 'finished' | 'stopped' | 'failed'.
-async function postPage(job, page, profiles, ended, sourceUrl) {
+async function postPage(job, page, profiles, ended, sourceUrl, scanned) {
   await emit(job, 'screening', { page, pageTo: job.pageTo });
   try {
     await api(job, `/sourcing/runs/${job.runId}/profiles`, {
       profiles, ended: !!ended, source_url: sourceUrl || '', search_level: (await getJob())?.level ?? job.level ?? 0,
+      scanned,   // people the page showed; `profiles` holds only those with an email
     });
     const cur = (await getJob()) || job;
     await setJob({ ...cur, pagesSent: (cur.pagesSent || 0) + 1, profilesSent: (cur.profilesSent || 0) + profiles.length });
@@ -269,6 +270,51 @@ function describeAttempt(job, page, res) {
     + `${res?.noResults ? ' no-results-page' : ''}${d.timedOut ? ' timed-out' : ''} anchors=${d.anchors ?? '?'} title="${d.title || ''}"${text}`;
 }
 
+// Open one candidate's contact dialog in the tab and read the phone/email they share with the recruiter.
+// Returns {email, phone} (both '' when nothing is shared) or {block} when LinkedIn stops us.
+async function readContactIn(tabId, profileUrl) {
+  const url = Core.contactInfoUrl(profileUrl);
+  if (!url) return { email: '', phone: '' };
+  try {
+    await navigate(tabId, url);
+    const landed = await chrome.tabs.get(tabId).catch(() => null);
+    if (landed?.url && Core.isLinkedinLoginUrl(landed.url)) return { block: 'not_logged_in' };
+    const res = (await sendToTab(tabId, { type: 'LI_EXTRACT_CONTACT' }, 6, 1000)) || {};
+    if (res.block) return { block: res.block };
+    return { email: res.email || '', phone: res.phone || '' };
+  } catch (e) {
+    console.warn(LOG, 'contact read failed for', profileUrl, e.message);
+    return { email: '', phone: '' };
+  }
+}
+
+// A candidate is taken only with an email. For every card on this page that could have one (1st-degree connections),
+// open the contact dialog and keep the people it gives an email for. Everyone else is left out, and 2nd/3rd-degree
+// people are never opened. Returns {kept, asked} or {blocked} / {stopped}.
+async function collectEmails(job, page, cards) {
+  const todo = cards.filter((c) => Core.canShareEmail(c));
+  const kept = [];
+  if (!todo.length) return { kept, asked: 0 };
+  let tab;
+  try { tab = await chrome.tabs.create({ url: 'about:blank', active: !!cfg.WORK_TAB_ACTIVE }); }
+  catch (e) { return { kept, asked: 0 }; }
+  let blocked = null;
+  try {
+    for (let i = 0; i < todo.length; i++) {
+      if (!(await isCurrent(job))) return { stopped: true };
+      await emit(job, 'contacts', { page, pageTo: job.pageTo, done: i, total: todo.length });
+      const found = await readContactIn(tab.id, todo[i].source_link);
+      if (found.block) { blocked = found.block; return { blocked }; }
+      if (found.email) kept.push({ ...todo[i], email: found.email, phone: found.phone || '' });
+      if (i < todo.length - 1 && !(await sleepAlive(job, randomMs(cfg.PROFILE_PAUSE_SECONDS)))) return { stopped: true };
+    }
+  } finally {
+    if (blocked === 'captcha') { try { await chrome.tabs.update(tab.id, { active: true }); } catch (e) { /* gone */ } }
+    else await closeTab(tab.id);   // a CAPTCHA tab stays open and in front: only the recruiter can complete it
+  }
+  return { kept, asked: todo.length };
+}
+
 // Set the search step for this run and remember it (so a restarted worker and later pages keep using it).
 async function setLevel(job, level) {
   job.level = level;
@@ -281,11 +327,12 @@ async function crawl(job) {
   const tabId = job.tabId;
   const lastLevel = Core.searchLevels(job.plan).length - 1;
   const trail = [];
+  const searchOpts = { firstDegreeOnly: !!cfg.EMAIL_ONLY };
   let page = job.pageFrom;
   while (page <= job.pageTo) {
     if (!(await isCurrent(job))) return;
 
-    try { await navigate(tabId, Core.buildSearchUrl(job.plan, page, job.level)); }
+    try { await navigate(tabId, Core.buildSearchUrl(job.plan, page, job.level, searchOpts)); }
     catch (e) { return failRun(job, 'search_failed', e.message); }
     if (!(await isCurrent(job))) return;
     await emit(job, 'scraping', { page, pageTo: job.pageTo });
@@ -317,7 +364,17 @@ async function crawl(job) {
     // An empty later page just means the results ran out: tell SkillMate, which then stops searching. A page of
     // only hidden "LinkedIn Member" cards ends the useful results too (LinkedIn lists nearest connections first).
     const ended = !!res.ended || !profiles.length;
-    const outcome = await postPage(job, page, profiles, ended, res.diag?.url || landed?.url);
+
+    // Take only the people who have an email: ask each one's contact dialog before anything reaches SkillMate.
+    let outgoing = profiles;
+    if (cfg.EMAIL_ONLY) {
+      const got = await collectEmails(job, page, profiles);
+      if (got.stopped || !(await isCurrent(job))) return;
+      if (got.blocked) return failRun(job, got.blocked, `page ${page}, reading contact details`, trail.join(' ; '));
+      outgoing = got.kept;
+      trail.push(`contacts p${page}: cards=${profiles.length} asked=${got.asked} emails=${outgoing.length}`);
+    }
+    const outcome = await postPage(job, page, outgoing, ended, res.diag?.url || landed?.url, profiles.length);
     if (outcome !== 'next') return;
 
     page += 1;
