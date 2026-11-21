@@ -47,6 +47,10 @@ class Settings(BaseSettings):
     SOURCING_SCREEN_CONCURRENCY: int = 4   # screening calls in flight at once
     LLM_MAX_TOKENS_SOURCING: int = 32000   # reasoning models spend part of this on hidden reasoning
     SOURCING_RUN_TIMEOUT_MINUTES: int = 20
+    # LinkedIn is read more gently than ResDex: its pages hold ~10 people, and fewer pages are read per click.
+    SOURCING_LINKEDIN_PAGES_PER_RUN: int = 4
+    SOURCING_LINKEDIN_PREFETCH_PAGES: int = 1
+    SOURCING_LINKEDIN_MAX_PAGE: int = 20
 
     # Level 1 (AI-generated proctored exam)
     LEVEL1_PASS_PERCENT: int = 75           # candidates must score ABOVE this to pass Level 1

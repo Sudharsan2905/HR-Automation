@@ -5,6 +5,7 @@ import type {
   RunStartResult,
   SaveContactResult,
   SetStatusResult,
+  SourceKey,
   SourcedProfile,
   SourcedProfileDetail,
   SourcingJdDetail,
@@ -43,8 +44,8 @@ export const updateSearchPlan = (id: string, plan: SourcingSearchPlan) =>
 export const deleteSourcingJd = (id: string) =>
   apiClient.delete<unknown, { message: string }>(`/sourcing/jds/${id}`);
 
-export const startRun = (id: string) =>
-  apiClient.post<unknown, RunStartResult>(`/sourcing/jds/${id}/runs`, {});
+export const startRun = (id: string, source: SourceKey = "naukri") =>
+  apiClient.post<unknown, RunStartResult>(`/sourcing/jds/${id}/runs`, { source });
 
 export const getRun = (runId: string) =>
   apiClient.get<unknown, SourcingRun>(`/sourcing/runs/${runId}`);

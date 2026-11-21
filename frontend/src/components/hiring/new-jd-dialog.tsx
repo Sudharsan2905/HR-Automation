@@ -12,6 +12,8 @@ import { Loader2, Sparkles, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 
 const MAX_FILE = 15 * 1024 * 1024;
+// Same minimum as the backend (sourcing/service.py MIN_JD_CHARS): shorter text is a title or a note, not a JD.
+const MIN_JD_CHARS = 80;
 
 export function NewJdDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
   const router = useRouter();
@@ -21,8 +23,14 @@ export function NewJdDialog({ open, onOpenChange }: { open: boolean; onOpenChang
   const [jdFile, setJdFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const pasted = jdText.trim().length;
+  const pastedIsJd = pasted >= MIN_JD_CHARS;
+
   const submit = async () => {
-    if (!jdText.trim() && !jdFile) return toast.error("Paste the job description or upload a PDF/DOCX");
+    if (!pasted && !jdFile) return toast.error("Paste the job description or upload a PDF/DOCX");
+    if (pasted && !pastedIsJd && !jdFile) {
+      return toast.error(`The job description is too short (${pasted} of at least ${MIN_JD_CHARS} characters). Paste the full text or upload a PDF/DOCX.`);
+    }
     setSubmitting(true);
     try {
       const created = await createSourcingJd({ title, jd_text: jdText, jd_file: jdFile });
@@ -42,7 +50,7 @@ export function NewJdDialog({ open, onOpenChange }: { open: boolean; onOpenChang
         <DialogHeader>
           <DialogTitle>New hiring flow</DialogTitle>
           <DialogDescription>
-            SkillMate reads the JD, sources matching profiles from Naukri, then runs the Level 1 exam automatically.
+            SkillMate reads the JD, sources matching profiles from Naukri (or LinkedIn), then runs the Level 1 exam automatically.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
@@ -81,8 +89,15 @@ export function NewJdDialog({ open, onOpenChange }: { open: boolean; onOpenChang
                 </span>
               )}
             </div>
-            {jdText.trim() && jdFile && (
-              <p className="text-xs text-muted-foreground">Pasted text is used; the uploaded file is ignored.</p>
+            {pasted > 0 && jdFile && (
+              <p className="text-xs text-muted-foreground">
+                {pastedIsJd
+                  ? "Pasted text is used; the uploaded file is ignored."
+                  : `The pasted text is too short to be a job description (${pasted} of ${MIN_JD_CHARS} characters), so the uploaded file is used.`}
+              </p>
+            )}
+            {pasted > 0 && !pastedIsJd && !jdFile && (
+              <p className="text-xs text-amber-600">{pasted} of at least {MIN_JD_CHARS} characters — paste the full job description or upload a PDF/DOCX.</p>
             )}
           </div>
           <div className="flex justify-end">

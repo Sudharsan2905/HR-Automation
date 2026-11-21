@@ -96,7 +96,7 @@ export function ProfileDetailSheet({ profile, onClose, actions }: {
               {actions(profile)}
               <a href={profile.source_link} target="_blank" rel="noopener noreferrer"
                 className="ml-auto inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground hover:underline">
-                Open in ResDex <ExternalLink className="h-3.5 w-3.5" />
+                Open in {profile.source === "LinkedIn" ? "LinkedIn" : "ResDex"} <ExternalLink className="h-3.5 w-3.5" />
               </a>
             </div>
           )}
@@ -217,7 +217,7 @@ export function ProfileDetailSheet({ profile, onClose, actions }: {
                 <Separator />
                 <Section title="History">
                   <ul className="space-y-1.5 text-sm">
-                    <li className="text-muted-foreground">Found on Naukri · {new Date(d.created_at).toLocaleString()}</li>
+                    <li className="text-muted-foreground">Found on {d.source || "Naukri"} · {new Date(d.created_at).toLocaleString()}</li>
                     {d.status_history.map((h, i) => (
                       <li key={i}>
                         <span className="capitalize font-medium">{label(h.status)}</span>

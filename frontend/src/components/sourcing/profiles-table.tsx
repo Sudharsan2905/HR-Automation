@@ -9,13 +9,18 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { saveContact, setProfileStatus } from "@/lib/api/sourcing";
 import type { useSkillmateExtension } from "@/hooks/use-skillmate-extension";
+import type { useLinkedinExtension } from "@/hooks/use-linkedin-extension";
 import type { ProfileStatus, SourcedProfile, SourcingRun, StatusCounts } from "@/types/sourcing";
 import { ExternalLink, Eye, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { LinkedinLoginDialog } from "./linkedin-login-dialog";
 import { ProfileDetailSheet } from "./profile-detail-sheet";
 import { ResdexLoginDialog } from "./resdex-login-dialog";
 
 type Ext = ReturnType<typeof useSkillmateExtension>;
+type LiExt = ReturnType<typeof useLinkedinExtension>;
+
+const isLinkedin = (p: { source: string }) => p.source === "LinkedIn";
 type Tab = "shortlisted" | "selected" | "on_hold" | "rejected" | "all";
 
 const TABS: { value: Tab; label: string }[] = [
@@ -46,11 +51,12 @@ function ScoreCell({ p }: { p: SourcedProfile }) {
   );
 }
 
-export function ProfilesTable({ profiles, counts, runs, ext, onChanged }: {
+export function ProfilesTable({ profiles, counts, runs, ext, li, onChanged }: {
   profiles: SourcedProfile[];
   counts: StatusCounts;
   runs: SourcingRun[];
   ext: Ext;
+  li: LiExt;
   onChanged: () => void;
 }) {
   const [tab, setTab] = useState<Tab>("shortlisted");
@@ -70,7 +76,49 @@ export function ProfilesTable({ profiles, counts, runs, ext, onChanged }: {
     else if (res.profile.candidate_user_id) toast.success(`${res.profile.name} added to Candidates`);
   };
 
+  // LinkedIn shows a phone/email only for people the recruiter is connected to, so "no email" is an ordinary
+  // outcome there: say so and let the recruiter type it in.
+  const linkedinReveal = async (p: SourcedProfile) => {
+    if (!li.installed || li.stale) {
+      toast.error(li.stale
+        ? "The SkillMate LinkedIn extension was updated — reload this page to reconnect it."
+        : "Install the SkillMate LinkedIn extension to read contact details — or enter the email manually.");
+      setEmailFor(p.id);
+      return;
+    }
+    const login = await li.checkLogin();
+    if (login === "not_logged_in") {
+      setLoginFor(p);
+      return;
+    }
+    if (login !== "ok") {
+      toast.error("The SkillMate LinkedIn extension didn't respond. Reload this page and try again.");
+      setEmailFor(p.id);
+      return;
+    }
+    const res = await li.reveal({ profileId: p.id, name: p.name, sourceLink: p.source_link });
+    if (res.ok && res.candidateError) {
+      onChanged();
+      toast.error(res.candidateError);
+      setEmailFor(p.id);
+    } else if (res.ok) {
+      onChanged();
+      toast.success(`Contact details saved for ${p.name}`);
+    } else if (res.reason === "not_logged_in") {
+      setLoginFor(p);
+    } else {
+      toast.error(
+        res.reason === "no_email" ? `${p.name} hasn't shared an email with you on LinkedIn — enter it manually.`
+        : res.reason === "busy" ? "A LinkedIn search is running — enter the email manually, or try again when it finishes."
+        : res.reason === "captcha" ? "LinkedIn is asking for a security check — complete it in the LinkedIn tab, then try again."
+        : res.reason === "restricted" ? "LinkedIn limited this account for now — enter the email manually."
+        : "Couldn't read an email from the LinkedIn profile — enter it manually.");
+      setEmailFor(p.id);
+    }
+  };
+
   const revealAndSave = async (p: SourcedProfile) => {
+    if (isLinkedin(p)) return linkedinReveal(p);
     const login = await ext.checkLogin();
     if (login === "not_logged_in") {
       setLoginFor(p);
@@ -169,8 +217,8 @@ export function ProfilesTable({ profiles, counts, runs, ext, onChanged }: {
         <p className="py-8 text-center text-sm text-muted-foreground">
           {tab === "shortlisted"
             ? (total > 0
-              ? `No shortlisted profiles yet. ${total} found profile${total > 1 ? "s are" : " is"} under “All” — click “Source from Naukri” to screen them and shortlist 5.`
-              : "No shortlisted profiles yet. Click “Source from Naukri” to find 5.")
+              ? `No shortlisted profiles yet. ${total} found profile${total > 1 ? "s are" : " is"} under “All” — click “Source candidates” to screen them and shortlist 5.`
+              : "No shortlisted profiles yet. Click “Source candidates” to find 5.")
             : "Nothing here."}
         </p>
       ) : (
@@ -196,10 +244,12 @@ export function ProfilesTable({ profiles, counts, runs, ext, onChanged }: {
                     className="text-left text-primary underline decoration-dotted underline-offset-4 hover:decoration-solid">
                     {p.name}
                   </button>
-                  <a href={p.source_link} target="_blank" rel="noopener noreferrer" title="Open in ResDex"
+                  <a href={p.source_link} target="_blank" rel="noopener noreferrer"
+                    title={`Open in ${isLinkedin(p) ? "LinkedIn" : "ResDex"}`}
                     className="ml-1 inline-flex text-muted-foreground hover:text-foreground">
                     <ExternalLink className="h-3 w-3" />
                   </a>
+                  <Badge variant="secondary" className="ml-2 text-[10px]">{p.source || "Naukri"}</Badge>
                   {p.status !== tab && <Badge variant="outline" className="ml-2 text-[10px] capitalize">{p.status.replace("_", " ")}</Badge>}
                 </TableCell>
                 <TableCell className="text-sm">{[p.current_title, p.current_company].filter(Boolean).join(" @ ") || p.headline || "—"}</TableCell>
@@ -238,7 +288,12 @@ export function ProfilesTable({ profiles, counts, runs, ext, onChanged }: {
       <ProfileDetailSheet profile={viewing} onClose={() => setViewId(null)} actions={actions} />
 
       <ResdexLoginDialog
-        open={!!loginFor}
+        open={!!loginFor && !isLinkedin(loginFor)}
+        onCancel={() => setLoginFor(null)}
+        onRetry={() => { const p = loginFor; setLoginFor(null); if (p) revealAndSave(p); }}
+      />
+      <LinkedinLoginDialog
+        open={!!loginFor && isLinkedin(loginFor)}
         onCancel={() => setLoginFor(null)}
         onRetry={() => { const p = loginFor; setLoginFor(null); if (p) revealAndSave(p); }}
       />

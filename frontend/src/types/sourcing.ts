@@ -1,6 +1,8 @@
 export type ProfileStatus = "pool" | "shortlisted" | "selected" | "rejected" | "on_hold" | "below_threshold";
 export type RunStatus = "pending" | "scraping" | "screening" | "done" | "failed" | "cancelled";
 export type AnalysisStatus = "generating" | "done" | "failed";
+/** Where a scrape run reads from: lower case on runs, capitalised ("Naukri" / "LinkedIn") on profiles. */
+export type SourceKey = "naukri" | "linkedin";
 
 export interface SkillSpec {
   name: string;
@@ -33,8 +35,11 @@ export interface SourcingRun {
   id: string;
   run_no: number;
   mode: "pool" | "scrape";
+  source: SourceKey;
   status: RunStatus;
   error: string | null;
+  /** What the extension saw when the run failed (page text, cards, search step). For support; not shown. */
+  debug?: string;
   pages_from: number | null;
   pages_to: number | null;
   pages_crawled: number | null;
@@ -66,6 +71,9 @@ export interface SourcingJdDetail extends SourcingJdSummary {
   search_plan: SourcingSearchPlan;
   next_page: number;
   pool_exhausted: boolean;
+  linkedin_next_page: number;
+  linkedin_exhausted: boolean;
+  linkedin_search_level: number;
   pool_count: number;
   active_run: SourcingRun | null;
   runs: SourcingRun[];
@@ -87,6 +95,7 @@ export interface SourcedProfile {
   id: string;
   run_id: string;
   shortlisted_in_run_id: string | null;
+  source: "Naukri" | "LinkedIn" | string;
   name: string;
   headline: string;
   location: string;
@@ -140,9 +149,12 @@ export interface SourcedProfileDetail extends Omit<SourcedProfile, "status_histo
 export interface RunStartResult {
   run: SourcingRun;
   mode: "pool" | "scrape";
+  source?: SourceKey;
   search_plan?: SourcingSearchPlan;
   page_from?: number;
   page_to?: number;
+  /** LinkedIn: the step of the extension's search ladder earlier runs settled on. */
+  search_level?: number;
 }
 
 export interface SetStatusResult {
@@ -156,4 +168,4 @@ export interface SaveContactResult {
   candidate_error: string | null;
 }
 
-export type RunFailReason = "not_logged_in" | "captcha" | "cancelled" | "error";
+export type RunFailReason = "not_logged_in" | "captcha" | "restricted" | "cancelled" | "error";

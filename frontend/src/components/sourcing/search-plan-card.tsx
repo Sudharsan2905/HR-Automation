@@ -44,7 +44,7 @@ export function SearchPlanCard({ plan, onSave }: { plan: SourcingSearchPlan; onS
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-        <CardTitle className="text-base">ResDex search</CardTitle>
+        <CardTitle className="text-base">Candidate search</CardTitle>
         {!editing && <Button variant="ghost" size="sm" onClick={startEdit}><Pencil className="mr-1 h-3.5 w-3.5" /> Edit</Button>}
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
@@ -81,7 +81,7 @@ export function SearchPlanCard({ plan, onSave }: { plan: SourcingSearchPlan; onS
               <div className="space-y-1"><Label>CTC max (L)</Label><Input value={form.ctc} onChange={set("ctc")} /></div>
             </div>
             <div className="space-y-1"><Label>Locations <span className="text-xs font-normal text-muted-foreground">comma separated</span></Label><Input value={form.locations} onChange={set("locations")} /></div>
-            <p className="text-xs text-muted-foreground">Saving restarts paging from ResDex page 1. Profiles already found are never shown twice.</p>
+            <p className="text-xs text-muted-foreground">Saving restarts paging from page 1 on Naukri and LinkedIn. Profiles already found are never shown twice.</p>
             <div className="flex justify-end gap-2">
               <Button variant="ghost" onClick={() => setEditing(false)} disabled={saving}>Cancel</Button>
               <Button

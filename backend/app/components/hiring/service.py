@@ -39,7 +39,7 @@ def profile_text(p: SourcedProfile) -> str:
     """Flatten a sourced profile into text the Level 1 agents can read."""
     lines = [p.name, p.headline, f"{p.current_title} at {p.current_company}".strip(" at"),
              f"Location: {p.location}", f"Experience: {p.total_experience}",
-             f"Skills: {', '.join(p.skills)}"]
+             f"Skills: {', '.join(p.skills)}", p.snippet]
     for exp in p.experiences:
         lines.append(" | ".join(str(v) for v in exp.values() if v))
     for edu in p.education:
@@ -67,7 +67,11 @@ async def _flow(jd_id: str) -> HiringFlow:
 
 
 async def ensure_candidate(p: SourcedProfile) -> HiringCandidate | None:
-    """Create the hiring row for a promoted profile (idempotent)."""
+    """Create the hiring row for a promoted profile (idempotent).
+
+    One person gets one row, and so one invite email, per JD. The same person found on Naukri and on LinkedIn
+    has two profiles but one SkillMate candidate (candidates are created by email), so a second profile with
+    that candidate reuses the first row instead of adding another."""
     if not p.candidate_user_id or not p.email:
         return None
     hc = await HiringCandidate.find_one(
@@ -75,6 +79,13 @@ async def ensure_candidate(p: SourcedProfile) -> HiringCandidate | None:
     )
     if hc:
         return hc
+    same_person = await HiringCandidate.find_one(
+        HiringCandidate.sourcing_jd_id == p.sourcing_jd_id, HiringCandidate.user_id == p.candidate_user_id
+    )
+    if same_person:
+        await log_event(p.sourcing_jd_id, "sourcing",
+                        f"{p.name} ({p.source}) has the same email as {same_person.name}: invited once, not twice")
+        return same_person
     hc = HiringCandidate(sourcing_jd_id=p.sourcing_jd_id, profile_id=str(p.id),
                          user_id=p.candidate_user_id, name=p.name, email=p.email.lower())
     await hc.insert()
@@ -135,6 +146,21 @@ async def sync_level1(jd_id: str) -> dict | None:
         waiting = await HiringCandidate.find(
             HiringCandidate.sourcing_jd_id == jd_id, HiringCandidate.level1_status == "not_started"
         ).to_list()
+        # Safety net: invite each email once. A waiting row whose email already belongs to another row of this JD
+        # (invited, finished, or waiting just ahead of it) is a duplicate of the same person: drop it.
+        handled = await HiringCandidate.find(
+            HiringCandidate.sourcing_jd_id == jd_id, HiringCandidate.level1_status != "not_started"
+        ).to_list()
+        seen: set[str] = {h.email.strip().lower() for h in handled}
+        unique = []
+        for hc in waiting:
+            key = hc.email.strip().lower()
+            if key in seen:
+                await hc.delete()
+                continue
+            seen.add(key)
+            unique.append(hc)
+        waiting = unique
         if not waiting:
             return None
         cands = []
@@ -338,9 +364,9 @@ def _stages(jd: SourcingJd, last_run: SourcingRun | None, run: dict | None, cand
     jd_stage = _stage("jd", "JD analysis", {"done": "done", "failed": "failed"}.get(jd.analysis_status, "running"),
                       error=jd.analysis_error)
     if not last_run:
-        sourcing = _stage("sourcing", "Naukri sourcing", "pending", "Click Source from Naukri")
+        sourcing = _stage("sourcing", "Sourcing", "pending", "Click Source candidates")
     else:
-        sourcing = _stage("sourcing", "Naukri sourcing",
+        sourcing = _stage("sourcing", "Sourcing",
                           {"done": "done", "failed": "failed"}.get(last_run.status, "running"),
                           f"{last_run.profiles_shortlisted} shortlisted", last_run.error)
     l1_status = "pending"

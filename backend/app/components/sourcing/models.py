@@ -57,8 +57,11 @@ class SourcingJd(Document):
     requirements_version: int = 0
     analysis_status: str = "generating"  # generating | done | failed
     analysis_error: str | None = None
-    next_page: int = 1
-    pool_exhausted: bool = False
+    next_page: int = 1                  # Naukri ResDex paging
+    pool_exhausted: bool = False        # Naukri has no more results for this search
+    linkedin_next_page: int = 1         # LinkedIn paging (kept apart: the two sources paginate differently)
+    linkedin_exhausted: bool = False
+    linkedin_search_level: int = 0      # which step of the extension's search ladder LinkedIn paging belongs to
     created_at: datetime = Field(default_factory=_now)
     updated_at: datetime = Field(default_factory=_now)
 
@@ -68,11 +71,12 @@ class SourcingJd(Document):
 
 
 class SourcingRun(Document):
-    """One "Source from Naukri" click."""
+    """One "Source candidates" click."""
     sourcing_jd_id: str
     run_no: int
     clicked_by: str
     mode: str  # pool | scrape
+    source: str = "naukri"  # naukri | linkedin (which extension reads the pages of a scrape run)
     keywords_used: str = ""
     pages_from: int | None = None
     pages_to: int | None = None
@@ -87,6 +91,7 @@ class SourcingRun(Document):
     prefetch_left: int = 0
     next_action: str | None = None  # "next_page" while SkillMate is waiting for the extension's next page
     error: str | None = None
+    debug: str = ""         # what the extension saw when the run failed (page text, cards, search step), for support
     created_at: datetime = Field(default_factory=_now)
     updated_at: datetime | None = None  # last activity; a run idle past the timeout is expired
     finished_at: datetime | None = None
@@ -97,14 +102,15 @@ class SourcingRun(Document):
 
 
 class SourcedProfile(Document):
-    """A Naukri profile found for a sourcing JD."""
+    """A Naukri or LinkedIn profile found for a sourcing JD."""
     sourcing_jd_id: str
     run_id: str
     shortlisted_in_run_id: str | None = None
-    source: str = "Naukri"
+    source: str = "Naukri"  # Naukri | LinkedIn
     source_link: str
     name: str
     headline: str = ""
+    snippet: str = ""
     location: str = ""
     current_company: str = ""
     current_title: str = ""

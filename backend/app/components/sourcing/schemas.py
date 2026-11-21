@@ -31,7 +31,9 @@ class LLMSearchPlan(BaseModel):
 
 class LLMSkillFinding(BaseModel):
     skill: str
-    match: Literal["present", "related", "absent"]
+    # "unverified" is only meaningful for LinkedIn cards, which show a headline and a snippet but not the
+    # full profile: the skill is not visible, yet the Boolean search already matched it on LinkedIn's side.
+    match: Literal["present", "related", "absent", "unverified"]
     related_skill: str = ""
     strength: Literal["none", "basic", "strong", "excellent"] = "none"
     evidence: str = ""
@@ -63,12 +65,13 @@ class LLMScreenBatch(BaseModel):
 
 
 class ScrapedProfileIn(BaseModel):
-    """A profile as the extension scraped it from ResDex (canonical shape)."""
+    """A profile as an extension scraped it from ResDex or LinkedIn (canonical shape)."""
     model_config = ConfigDict(extra="allow")
 
     name: str
     source_link: str = ""
     headline: str = ""
+    snippet: str = ""                   # LinkedIn: the text shown under a search result (matched keywords)
     location: str = ""
     skills: list[str] = Field(default_factory=list)
     experiences: list[dict] = Field(default_factory=list)
@@ -83,14 +86,20 @@ class ScrapedProfileIn(BaseModel):
 
 class ProfilesIn(BaseModel):
     profiles: list[ScrapedProfileIn] = Field(default_factory=list, max_length=400)
-    ended: bool = False                 # ResDex had no further result pages
+    ended: bool = False                 # the source had no further result pages
     pages_crawled: int | None = None    # ignored (older extension builds); SkillMate counts pages
-    source_url: str = ""                # the ResDex page the extension scraped
+    source_url: str = ""                # the results page the extension scraped
+    search_level: int | None = Field(None, ge=0, le=20)   # LinkedIn: the search step these pages came from
+
+
+class StartRunIn(BaseModel):
+    source: Literal["naukri", "linkedin"] = "naukri"
 
 
 class RunFailIn(BaseModel):
-    reason: Literal["not_logged_in", "captcha", "cancelled", "error"]
+    reason: Literal["not_logged_in", "captcha", "restricted", "cancelled", "error"]
     detail: str = ""
+    debug: str = Field("", max_length=1000)
 
 
 class StatusUpdateIn(BaseModel):

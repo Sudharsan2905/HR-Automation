@@ -83,8 +83,22 @@ def compute_score(
 
 
 def related_notes(screen: LLMScreenedProfile) -> list[str]:
-    return [
+    notes = [
         f"{f.skill} not listed — related: {f.related_skill}"
         for f in screen.mandatory
         if f.match == "related"
     ]
+    # LinkedIn cards: matched by LinkedIn's search, but the skill itself isn't visible on the card.
+    notes += [f"{f.skill} not shown on the LinkedIn card — verify" for f in screen.mandatory if f.match == "unverified"]
+    return notes
+
+
+def apply_source_rules(screen: LLMScreenedProfile, source: str) -> LLMScreenedProfile:
+    """Enforce in code what the screener prompt asks for, whatever the model returned.
+
+    LinkedIn shows a card, not a full profile, so a skill it doesn't show is "unverified" (never "absent").
+    Naukri shows the full skill list, so there "unverified" does not exist: an unseen skill is "absent"."""
+    linkedin = (source or "").lower() == "linkedin"
+    wanted_from, wanted_to = ("absent", "unverified") if linkedin else ("unverified", "absent")
+    fixed = [f.model_copy(update={"match": wanted_to}) if f.match == wanted_from else f for f in screen.mandatory]
+    return screen.model_copy(update={"mandatory": fixed})

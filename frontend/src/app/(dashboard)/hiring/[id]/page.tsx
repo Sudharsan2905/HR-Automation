@@ -17,6 +17,7 @@ import { ActivityFeed, Level1RunPanel } from "@/components/hiring/level1-run-pan
 import { CandidatesTable } from "@/components/hiring/candidates-table";
 import { Level1DetailSheet } from "@/components/hiring/level1-detail-sheet";
 import { useSkillmateExtension } from "@/hooks/use-skillmate-extension";
+import { useLinkedinExtension } from "@/hooks/use-linkedin-extension";
 import {
   deleteSourcingJd, getSourcingJd, listProfiles, reanalyzeSourcingJd, updateRequirements, updateSearchPlan,
 } from "@/lib/api/sourcing";
@@ -42,6 +43,7 @@ export default function HiringFlowPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const ext = useSkillmateExtension();
+  const li = useLinkedinExtension();
 
   const [jd, setJd] = useState<SourcingJdDetail | null>(null);
   const [profiles, setProfiles] = useState<SourcedProfile[]>([]);
@@ -142,7 +144,7 @@ export default function HiringFlowPage() {
         backHref="/hiring"
         action={
           <div className="flex items-center gap-2">
-            {jd.analysis_status === "done" && <SourceButton jd={jd} ext={ext} onChanged={() => { load(); reloadFlow(); }} />}
+            {jd.analysis_status === "done" && <SourceButton jd={jd} ext={ext} li={li} onChanged={() => { load(); reloadFlow(); }} />}
             <Button variant="ghost" size="icon" title="Delete" onClick={onDelete}><Trash2 className="h-4 w-4" /></Button>
           </div>
         }
@@ -156,7 +158,7 @@ export default function HiringFlowPage() {
         <Card>
           <CardContent className="flex items-center justify-between gap-4 p-5">
             {jd.analysis_status === "generating" ? (
-              <p className="inline-flex items-center gap-2 text-sm"><Loader2 className="h-4 w-4 animate-spin" /> Analyzing the JD and building the ResDex search…</p>
+              <p className="inline-flex items-center gap-2 text-sm"><Loader2 className="h-4 w-4 animate-spin" /> Analyzing the JD and building the candidate search…</p>
             ) : (
               <>
                 <div className="space-y-1">
@@ -209,6 +211,27 @@ export default function HiringFlowPage() {
           </TabsContent>
 
           <TabsContent value="sourcing" className="mt-4 space-y-4">
+            <div className="flex justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!!jd.active_run}
+                title={jd.active_run ? "Wait for the running sourcing run to finish" : undefined}
+                onClick={async () => {
+                  if (!window.confirm("Rebuild the requirements and the candidate search from the JD text? Your edits to them will be replaced.")) return;
+                  try {
+                    await reanalyzeSourcingJd(jd.id);
+                    toast.info("Re-analyzing the JD…");
+                    load();
+                    reloadFlow();
+                  } catch (err: unknown) {
+                    toast.error((err as { message?: string })?.message || "Could not re-analyze");
+                  }
+                }}
+              >
+                <RefreshCw className="mr-2 h-4 w-4" /> Re-analyze JD
+              </Button>
+            </div>
             <div className="grid gap-4 lg:grid-cols-2">
               <RequirementsCard
                 requirements={jd.requirements}
@@ -219,12 +242,12 @@ export default function HiringFlowPage() {
                 onSave={async (plan) => { setJd(await updateSearchPlan(jd.id, plan)); toast.success("Search updated"); }}
               />
             </div>
-            {jd.pool_exhausted && jd.pool_count === 0 && (
+            {jd.pool_count === 0 && jd.pool_exhausted && (jd.linkedin_exhausted || li.installed === false) && (
               <p className="text-sm text-amber-600">No more matches for this search. Edit the keywords or switch between primary and narrowed.</p>
             )}
             <Card>
               <CardContent className="p-4">
-                <ProfilesTable profiles={profiles} counts={jd.counts} runs={jd.runs} ext={ext} onChanged={() => { load(); reloadFlow(); }} />
+                <ProfilesTable profiles={profiles} counts={jd.counts} runs={jd.runs} ext={ext} li={li} onChanged={() => { load(); reloadFlow(); }} />
               </CardContent>
             </Card>
           </TabsContent>
